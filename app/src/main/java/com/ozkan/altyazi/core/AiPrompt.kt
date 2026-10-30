@@ -26,17 +26,6 @@ object AiPrompt {
         append("Subtitle to translate:\n").append(subtitle)
     }
 
-    /**
-     * Cleans a partial streamed reply for display while it is still being generated: strips a
-     * chatty prefix or opening quote as soon as it appears and caps the number of lines.
-     */
-    fun partial(reply: String): String =
-        reply.trimStart()
-            .replace(chattyPrefix, "")
-            .trimStart('"', '“', '«', ' ')
-            .lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.take(MAX_LINES)
-            .joinToString("\n")
-
     private val chattyPrefix = Regex(
         "^(here(?:'s| is)[^:]*:|translation:|translated:|çeviri:|türkçe:|sure[,!]?)\\s*",
         RegexOption.IGNORE_CASE,

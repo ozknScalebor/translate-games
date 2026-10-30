@@ -1,11 +1,7 @@
 package com.ozkan.altyazi.ui
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -16,7 +12,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -68,26 +63,6 @@ fun AppSettings.subtitleStyle(scale: Float = 1f): TextStyle = TextStyle(
     textAlign = TextAlign.Center,
     shadow = Shadow(Color.Black.copy(alpha = 0.85f), Offset(0f, 3f), blurRadius = 10f),
 )
-
-/** Three pulsing dots in the subtitle style while the AI starts writing a line. */
-@Composable
-private fun TypingDots(style: TextStyle) {
-    val transition = rememberInfiniteTransition(label = "typing")
-    Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
-        repeat(3) { i ->
-            val a by transition.animateFloat(
-                initialValue = 0.25f,
-                targetValue = 1f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(450, delayMillis = i * 150),
-                    repeatMode = RepeatMode.Reverse,
-                ),
-                label = "dot$i",
-            )
-            Text("•", style = style, modifier = Modifier.alpha(a).padding(horizontal = 4.dp))
-        }
-    }
-}
 
 /** Size of a history line relative to the current subtitle. */
 private const val HISTORY_SCALE = 0.55f
@@ -164,11 +139,7 @@ private fun Transcript(
                 ) {
                     val style = if (isCurrent) settings.subtitleStyle()
                     else settings.subtitleStyle(HISTORY_SCALE).copy(shadow = null)
-                    if (line.pending && line.translated.isEmpty()) {
-                        TypingDots(style)
-                    } else {
-                        Text(line.translated, style = style, modifier = Modifier.fillMaxWidth())
-                    }
+                    Text(line.translated, style = style, modifier = Modifier.fillMaxWidth())
                     if (settings.showOriginal) {
                         Spacer(Modifier.height(if (isCurrent) 12.dp else 4.dp))
                         Text(

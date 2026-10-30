@@ -113,7 +113,7 @@
     <string name="settings_clear_history">Altyazı geçmişini temizle</string>
 
     <string name="ai_title">Yapay zekâ ile çeviri (offline)</string>
-    <string name="ai_desc">Tablette çalışan Gemma 4 dil modeliyle çevirir: daha doğal Türkçe, kalan OCR hatalarını düzeltir, isimleri ve hitapları satırlar arasında tutarlı tutar. Her satır model yazdıkça akarak dolar; normal çeviri yalnızca yapay zekâ hata verirse kullanılır. İnternet, token veya ücret yok.</string>
+    <string name="ai_desc">Tablette çalışan Gemma 4 dil modeliyle çevirir: daha doğal Türkçe, kalan OCR hatalarını düzeltir, isimleri ve hitapları satırlar arasında tutarlı tutar. Her satır model bitirdiğinde tek seferde ve tam haliyle görünür; normal çeviri yalnızca yapay zekâ hata verirse kullanılır. İnternet, token veya ücret yok.</string>
     <string name="ai_status_loading">Model yükleniyor…</string>
     <string name="ai_status_ready_gpu">Hazır · ekran kartında çalışıyor</string>
     <string name="ai_status_ready_cpu">Hazır · işlemcide çalışıyor (daha yavaş)</string>
