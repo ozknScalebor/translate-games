@@ -3,6 +3,7 @@ package com.ozkan.altyazi.ui
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,6 +24,8 @@ import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.SportsEsports
+import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material.icons.rounded.Usb
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material3.CircularProgressIndicator
@@ -59,11 +62,10 @@ import com.ozkan.altyazi.ui.theme.AppColors
 
 @Composable
 fun TopBar(
-    cameras: List<CameraSource>,
-    activeCameraId: String?,
+    sourceControl: @Composable () -> Unit,
     modelState: ModelState,
     paused: Boolean,
-    onSelectCamera: (String) -> Unit,
+    onChangeSource: () -> Unit,
     onTogglePause: () -> Unit,
     onFocusMode: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -80,7 +82,13 @@ fun TopBar(
         Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge, maxLines = 1)
         Spacer(Modifier.width(24.dp))
 
-        CameraPicker(cameras, activeCameraId, onSelectCamera)
+        sourceControl()
+        Spacer(Modifier.width(8.dp))
+        TextButton(onClick = onChangeSource) {
+            Icon(Icons.Rounded.SwapHoriz, null, Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(stringResource(R.string.source_change), maxLines = 1)
+        }
         Spacer(Modifier.weight(1f))
         Spacer(Modifier.width(12.dp))
         ModelStatusPill(modelState, onDownload, onRetry)
@@ -103,10 +111,27 @@ fun TopBar(
     }
 }
 
+/** Connected PS5 shown in the top bar while streaming, with a disconnect action. */
+@Composable
+fun RemoteSourceChip(name: String, onDisconnect: () -> Unit) {
+    Surface(shape = RoundedCornerShape(14.dp), color = AppColors.SurfaceHigh) {
+        Row(Modifier.padding(start = 14.dp, end = 4.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Rounded.SportsEsports, null, tint = AppColors.Primary, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(10.dp))
+            Column {
+                Text(stringResource(R.string.remote_streaming_from), style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary)
+                Text(name, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+            }
+            Spacer(Modifier.width(8.dp))
+            TextButton(onClick = onDisconnect) { Text(stringResource(R.string.remote_disconnect), color = AppColors.Danger) }
+        }
+    }
+}
+
 /** Camera source dropdown; cameras plugged in at runtime show up here automatically. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CameraPicker(cameras: List<CameraSource>, activeCameraId: String?, onSelect: (String) -> Unit) {
+fun CameraPicker(cameras: List<CameraSource>, activeCameraId: String?, onSelect: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     val active = cameras.firstOrNull { it.id == activeCameraId }
 

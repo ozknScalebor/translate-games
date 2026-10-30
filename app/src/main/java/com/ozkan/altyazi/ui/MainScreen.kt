@@ -4,7 +4,9 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -27,6 +29,7 @@ import androidx.compose.material.icons.rounded.VideocamOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
@@ -45,6 +48,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -53,76 +58,39 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ozkan.altyazi.R
 import com.ozkan.altyazi.ai.AiTranslator
+import com.ozkan.altyazi.data.FrameSource
+import com.ozkan.altyazi.remote.Connection
+import com.ozkan.altyazi.remote.SavedConsole
 import com.ozkan.altyazi.translate.ModelState
 import com.ozkan.altyazi.translate.OfflineTranslator
+import com.ozkan.altyazi.ui.remote.RemotePlayActions
+import com.ozkan.altyazi.ui.remote.RemotePlayScreen
 import com.ozkan.altyazi.ui.theme.AppColors
 
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
     val state by viewModel.ui.collectAsStateWithLifecycle()
-    var settingsOpen by rememberSaveable { mutableStateOf(false) }
-
-    // The camera card is movable content: switching between the split and fullscreen layouts moves
-    // the live preview instead of tearing it down, so recognition never stops.
-    val cameraCard = remember(viewModel) {
-        movableContentOf { s: UiState, compact: Boolean, modifier: Modifier ->
-            CameraCard(s, viewModel, compact, modifier)
-        }
-    }
+    val remote by viewModel.remote.state.collectAsStateWithLifecycle()
+    val remoteActions = remember(viewModel) { remoteActionsFor(viewModel) }
 
     Box(Modifier.fillMaxSize().background(AppColors.Background)) {
-        if (state.focusMode) {
-            FocusLayout(
-                state = state,
-                camera = { modifier -> cameraCard(state, true, modifier) },
-                onTogglePause = viewModel::togglePause,
-                onExit = { viewModel.setFocusMode(false) },
-            )
-        } else {
-            Column(Modifier.fillMaxSize()) {
-                TopBar(
-                    cameras = state.cameras,
-                    activeCameraId = state.activeCameraId,
-                    modelState = state.modelState,
-                    paused = state.paused,
-                    onSelectCamera = viewModel::selectCamera,
-                    onTogglePause = viewModel::togglePause,
-                    onFocusMode = { viewModel.setFocusMode(true) },
-                    onOpenSettings = { settingsOpen = true },
-                    onDownload = viewModel::requestDownload,
-                    onRetry = viewModel::retryModel,
-                )
-                Row(
-                    modifier = Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
-                    horizontalArrangement = Arrangement.spacedBy(20.dp),
-                ) {
-                    Column(Modifier.weight(0.46f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        cameraCard(state, false, Modifier.fillMaxWidth())
-                        CameraFooter(state)
-                    }
-                    SubtitlePanel(
-                        lines = state.lines,
-                        settings = state.settings,
-                        onScreen = state.subtitleOnScreen,
-                        placeholder = placeholderFor(state),
-                        modifier = Modifier.weight(0.54f).fillMaxHeight(),
-                    )
+        when (state.source) {
+            null -> SourcePicker(onSelect = viewModel::selectSource)
+            FrameSource.CAMERA -> {
+                BackHandler { viewModel.selectSource(null) }
+                CameraPermissionGate(onBack = { viewModel.selectSource(null) }) {
+                    TranslatorLayout(state, viewModel, streamingFrom = null)
                 }
             }
-        }
-
-        if (settingsOpen) {
-            SettingsSheet(
-                settings = state.settings,
-                voiceMissing = state.voiceMissing,
-                aiState = state.aiState,
-                onAiDownload = viewModel::requestAiDownload,
-                onAiRetry = viewModel::retryAi,
-                onUpdate = viewModel::updateSettings,
-                onResetRoi = viewModel::resetRoi,
-                onClearHistory = viewModel::clearHistory,
-                onDismiss = { settingsOpen = false },
-            )
+            FrameSource.REMOTE_PLAY -> {
+                val connection = remote.connection
+                if (connection is Connection.Streaming) {
+                    BackHandler { viewModel.remote.disconnect() }
+                    TranslatorLayout(state, viewModel, streamingFrom = connection.console.name)
+                } else {
+                    RemotePlayScreen(remote, remoteActions)
+                }
+            }
         }
 
         if (state.showAiDownloadPrompt) {
@@ -146,6 +114,130 @@ fun MainScreen(viewModel: MainViewModel) {
                 onDismiss = viewModel::dismissDownloadPrompt,
             )
         }
+    }
+}
+
+private fun remoteActionsFor(viewModel: MainViewModel) = object : RemotePlayActions {
+    private val remote = viewModel.remote
+    override fun back() = viewModel.selectSource(null)
+    override fun useCamera() = viewModel.selectSource(FrameSource.CAMERA)
+    override fun connect(console: SavedConsole) = remote.connect(console)
+    override fun cancelConnect() = remote.disconnect()
+    override fun dismissError() = remote.dismissError()
+    override fun submitLoginPin(pin: String) = remote.submitLoginPin(pin)
+    override fun pair(host: String, accountId: String, pin: String, name: String) = remote.pair(host, accountId, pin, name)
+    override fun cancelPairing() = remote.cancelPairing()
+    override fun resetPairing() = remote.resetPairing()
+    override fun rename(id: String, name: String) = remote.rename(id, name)
+    override fun forget(id: String) = remote.forget(id)
+}
+
+/**
+ * Picture on the left, translated subtitles on the right (or fullscreen subtitles with a small
+ * picture in the corner). [streamingFrom] is the PS5's name in Remote Play mode, null for a camera.
+ */
+@Composable
+private fun TranslatorLayout(state: UiState, viewModel: MainViewModel, streamingFrom: String?) {
+    var settingsOpen by rememberSaveable { mutableStateOf(false) }
+    val remoteMode = streamingFrom != null
+
+    // The picture card is movable content: switching between the split and fullscreen layouts moves
+    // the live preview instead of tearing it down, so recognition never stops.
+    val pictureCard = remember(viewModel, remoteMode) {
+        movableContentOf { s: UiState, compact: Boolean, modifier: Modifier ->
+            if (remoteMode) StreamCard(s, viewModel, compact, modifier) else CameraCard(s, viewModel, compact, modifier)
+        }
+    }
+
+    if (state.focusMode) {
+        FocusLayout(
+            state = state,
+            camera = { modifier -> pictureCard(state, true, modifier) },
+            onTogglePause = viewModel::togglePause,
+            onExit = { viewModel.setFocusMode(false) },
+        )
+    } else {
+        Column(Modifier.fillMaxSize()) {
+            TopBar(
+                sourceControl = {
+                    if (streamingFrom != null) RemoteSourceChip(streamingFrom, onDisconnect = viewModel.remote::disconnect)
+                    else CameraPicker(state.cameras, state.activeCameraId, viewModel::selectCamera)
+                },
+                modelState = state.modelState,
+                paused = state.paused,
+                onChangeSource = { viewModel.selectSource(null) },
+                onTogglePause = viewModel::togglePause,
+                onFocusMode = { viewModel.setFocusMode(true) },
+                onOpenSettings = { settingsOpen = true },
+                onDownload = viewModel::requestDownload,
+                onRetry = viewModel::retryModel,
+            )
+            Row(
+                modifier = Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+                Column(Modifier.weight(0.46f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    pictureCard(state, false, Modifier.fillMaxWidth())
+                    CameraFooter(state, remoteMode)
+                }
+                SubtitlePanel(
+                    lines = state.lines,
+                    settings = state.settings,
+                    onScreen = state.subtitleOnScreen,
+                    placeholder = placeholderFor(state),
+                    modifier = Modifier.weight(0.54f).fillMaxHeight(),
+                )
+            }
+        }
+    }
+
+    if (settingsOpen) {
+        SettingsSheet(
+            settings = state.settings,
+            voiceMissing = state.voiceMissing,
+            aiState = state.aiState,
+            onAiDownload = viewModel::requestAiDownload,
+            onAiRetry = viewModel::retryAi,
+            onUpdate = viewModel::updateSettings,
+            onResetRoi = viewModel::resetRoi,
+            onClearHistory = viewModel::clearHistory,
+            onDismiss = { settingsOpen = false },
+        )
+    }
+}
+
+/** The PS5's own picture (Remote Play) with the subtitle-region selector on top. */
+@Composable
+private fun StreamCard(state: UiState, viewModel: MainViewModel, compact: Boolean, modifier: Modifier) {
+    val preview by viewModel.remote.preview.collectAsStateWithLifecycle()
+    val shape = RoundedCornerShape(if (compact) 16.dp else 24.dp)
+    Box(
+        modifier
+            .aspectRatio(16f / 9f)
+            .clip(shape)
+            .background(Color.Black)
+            .border(1.dp, AppColors.Outline, shape)
+    ) {
+        val frame = preview
+        if (frame != null) {
+            // seq changes with every frame; the bitmaps themselves are reused.
+            val image = remember(frame.seq) { frame.bitmap.asImageBitmap() }
+            Image(image, contentDescription = null, contentScale = ContentScale.FillBounds, modifier = Modifier.fillMaxSize())
+        } else {
+            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.dp, color = AppColors.Primary)
+                if (!compact) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(stringResource(R.string.remote_waiting_picture), color = AppColors.TextSecondary)
+                }
+            }
+        }
+        RoiSelector(
+            roi = state.settings.streamRoi,
+            onRoiChanged = viewModel::updateRoi,
+            modifier = Modifier.fillMaxSize(),
+        )
+        PausedBadge(state.paused, compact)
     }
 }
 
@@ -180,33 +272,41 @@ private fun CameraCard(state: UiState, viewModel: MainViewModel, compact: Boolea
             CenterMessage(Icons.Rounded.VideocamOff, stringResource(R.string.camera_none))
         }
 
-        if (state.paused) {
-            Surface(
-                color = AppColors.Accent,
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.align(Alignment.TopStart).padding(if (compact) 6.dp else 12.dp),
-            ) {
-                Text(
-                    stringResource(R.string.paused_badge),
-                    color = Color.Black,
-                    fontWeight = FontWeight.Bold,
-                    style = if (compact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                )
-            }
-        }
+        PausedBadge(state.paused, compact)
     }
 }
 
 @Composable
-private fun CameraFooter(state: UiState) {
+private fun BoxScope.PausedBadge(paused: Boolean, compact: Boolean) {
+    if (!paused) return
+    Surface(
+        color = AppColors.Accent,
+        shape = RoundedCornerShape(8.dp),
+        modifier = Modifier.align(Alignment.TopStart).padding(if (compact) 6.dp else 12.dp),
+    ) {
+        Text(
+            stringResource(R.string.paused_badge),
+            color = Color.Black,
+            fontWeight = FontWeight.Bold,
+            style = if (compact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+        )
+    }
+}
+
+@Composable
+private fun CameraFooter(state: UiState, remoteMode: Boolean) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxHeight()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Rounded.TouchApp, null, tint = AppColors.Accent, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            Text(stringResource(R.string.hint_roi), style = MaterialTheme.typography.bodyMedium, color = AppColors.TextSecondary)
+            Text(
+                stringResource(if (remoteMode) R.string.hint_roi_stream else R.string.hint_roi),
+                style = MaterialTheme.typography.bodyMedium,
+                color = AppColors.TextSecondary,
+            )
         }
-        state.cameraError?.let {
+        if (!remoteMode) state.cameraError?.let {
             Text(stringResource(R.string.camera_error, it), style = MaterialTheme.typography.bodySmall, color = AppColors.Danger)
             Text(stringResource(R.string.camera_hint_external), style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary)
         }

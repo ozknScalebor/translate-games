@@ -1,7 +1,9 @@
 package com.ozkan.altyazi.ui
 
 import android.app.Application
+import android.graphics.Bitmap
 import android.hardware.camera2.CameraManager
+import android.media.Image
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -25,11 +27,14 @@ import com.ozkan.altyazi.core.SubtitleStabilizer
 import com.ozkan.altyazi.core.SubtitleText
 import com.ozkan.altyazi.core.WordDictionary
 import com.ozkan.altyazi.data.AppSettings
+import com.ozkan.altyazi.data.FrameSource
 import com.ozkan.altyazi.data.Language
 import com.ozkan.altyazi.data.Roi
 import com.ozkan.altyazi.data.SettingsRepository
 import com.ozkan.altyazi.ocr.SubtitleEnhancer
 import com.ozkan.altyazi.ocr.SubtitleOcr
+import com.ozkan.altyazi.remote.RemotePlayController
+import com.ozkan.altyazi.remote.YuvFrames
 import com.ozkan.altyazi.translate.ModelState
 import com.ozkan.altyazi.translate.OfflineTranslator
 import com.ozkan.altyazi.tts.Speaker
@@ -46,6 +51,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** One subtitle in the transcript. [refined] marks a line translated by the on-device AI. */
 data class SubtitleLine(
@@ -59,6 +65,8 @@ data class SubtitleLine(
 data class Metrics(val ocrMs: Long, val translateMs: Long?, val aiMs: Long? = null)
 
 data class UiState(
+    /** Chosen on every launch; null while the source picker is shown. */
+    val source: FrameSource? = null,
     val settings: AppSettings = AppSettings(),
     val settingsLoaded: Boolean = false,
     val cameras: List<CameraSource> = emptyList(),
@@ -79,10 +87,12 @@ data class UiState(
 )
 
 /**
- * Pipeline: camera frame → subtitle crop → OCR → stabilizer → offline translation → screen (+ voice).
+ * Pipeline: frame (camera or PS5 Remote Play) → subtitle crop → OCR → stabilizer → translation →
+ * screen (+ voice).
  *
- * OCR runs synchronously on the analysis thread (CameraX keeps only the latest frame, which gives
- * natural back-pressure). Translation runs on the main scope and the newest subtitle always wins.
+ * OCR runs on the analysis thread one frame at a time (CameraX keeps only the latest frame; stream
+ * frames are skipped while a frame is being read), which gives natural back-pressure. Translation
+ * runs on the main scope and the newest subtitle always wins.
  */
 class MainViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -92,6 +102,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val speaker = Speaker(app)
     private val stabilizer = SubtitleStabilizer()
     private val ai = AiTranslator(app, viewModelScope)
+    val remote = RemotePlayController(app, viewModelScope)
+    /** True while a stream frame is being read; newer frames are dropped meanwhile. */
+    private val streamBusy = AtomicBoolean(false)
+    @Volatile private var source: FrameSource? = null
 
     /** Recent AI translations given to the model as context (names, tone, forms of address). */
     private val aiContext = ArrayDeque<AiPrompt.ContextLine>()
@@ -141,7 +155,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     if (s.aiTranslation) ai.enable() else ai.disable()
                 }
                 if (pairChanged) aiContext.clear()
-                if (previous.roi != s.roi) stabilizer.reset()
+                if (previous.roi != s.roi || previous.streamRoi != s.streamRoi) stabilizer.reset()
                 _ui.update { it.copy(settings = s, settingsLoaded = true) }
                 if (first || previous.cameraId != s.cameraId) chooseCamera()
                 first = false
@@ -177,6 +191,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
         cameraManager.registerAvailabilityCallback(availabilityCallback, Handler(Looper.getMainLooper()))
         viewModelScope.launch { refreshCameras() }
+        remote.frameSink = ::onStreamFrame
+    }
+
+    // ---------- Source ----------
+
+    /** Switches between camera and PS5 Remote Play; null returns to the source picker. */
+    fun selectSource(value: FrameSource?) {
+        if (value == source) return
+        source = value
+        stabilizer.reset()
+        if (value == FrameSource.REMOTE_PLAY) remote.startDiscovery() else remote.close()
+        _ui.update { it.copy(source = value, subtitleOnScreen = false, metrics = null) }
     }
 
     // ---------- Camera ----------
@@ -237,15 +263,56 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     // ---------- Analysis pipeline ----------
 
     private fun analyze(image: ImageProxy) {
-        if (paused || !modelReady) return
+        if (source != FrameSource.CAMERA || paused || !modelReady) return
         val now = SystemClock.elapsedRealtime()
         if (now - lastFrameAt < MIN_FRAME_INTERVAL_MS) return
         lastFrameAt = now
-
         val s = settings
+        val crop = try {
+            FrameCropper.crop(image, s.roi)
+        } catch (e: Exception) {
+            return
+        } catch (e: OutOfMemoryError) {
+            return
+        }
+        analyzeCrop(crop, s)
+    }
+
+    /**
+     * Called on the stream's frame thread. The subtitle region is converted right away (the frame is
+     * recycled as soon as this returns) and read on the analysis thread.
+     */
+    private fun onStreamFrame(image: Image) {
+        if (source != FrameSource.REMOTE_PLAY || paused || !modelReady) return
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastFrameAt < MIN_FRAME_INTERVAL_MS || !streamBusy.compareAndSet(false, true)) return
+        lastFrameAt = now
+        val s = settings
+        val crop = try {
+            FrameCropper.scaleForOcr(YuvFrames.crop(image, s.streamRoi))
+        } catch (e: Throwable) {
+            streamBusy.set(false)
+            return
+        }
+        try {
+            analysisExecutor.execute {
+                try {
+                    analyzeCrop(crop, s)
+                } finally {
+                    streamBusy.set(false)
+                }
+            }
+        } catch (e: java.util.concurrent.RejectedExecutionException) {
+            crop.recycle()
+            streamBusy.set(false)
+        }
+    }
+
+    /** OCR + voting on one subtitle crop; runs on the analysis thread and recycles [crop]. */
+    private fun analyzeCrop(crop: Bitmap, s: AppSettings) {
         val started = SystemClock.elapsedRealtime()
         val read = try {
-            readSubtitle(image, s)
+            readSubtitle(crop, s)
         } catch (e: Exception) {
             Read.EMPTY
         } catch (e: OutOfMemoryError) {
@@ -267,9 +334,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * OCRs the subtitle crop and, in dual-pass mode, a high-contrast copy that isolates the white
      * subtitle text from the scene behind it. The better-scoring read wins.
      */
-    private fun readSubtitle(image: ImageProxy, s: AppSettings): Read {
+    private fun readSubtitle(crop: Bitmap, s: AppSettings): Read {
         val english = s.sourceLanguage == Language.ENGLISH
-        val crop = FrameCropper.crop(image, s.roi)
         val variants = mutableListOf(crop)
         try {
             if (s.quality.dualPass) variants += SubtitleEnhancer.isolateSubtitleText(crop)
@@ -401,9 +467,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { settingsRepository.update(transform) }
     }
 
-    fun updateRoi(roi: Roi) = updateSettings { it.copy(roi = roi) }
+    fun updateRoi(roi: Roi) {
+        val target = source
+        updateSettings { it.withRoi(target, roi) }
+    }
 
-    fun resetRoi() = updateRoi(Roi.DEFAULT)
+    fun resetRoi() = updateRoi(if (source == FrameSource.REMOTE_PLAY) Roi.STREAM_DEFAULT else Roi.DEFAULT)
 
     fun togglePause() {
         paused = !paused
@@ -446,6 +515,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun retryModel() = translator.retry()
 
     override fun onCleared() {
+        remote.frameSink = null
+        remote.close()
         cameraManager.unregisterAvailabilityCallback(availabilityCallback)
         analysisExecutor.shutdown()
         ocr.close()

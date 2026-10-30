@@ -9,7 +9,6 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.ozkan.altyazi.ui.CameraPermissionGate
 import com.ozkan.altyazi.ui.MainScreen
 import com.ozkan.altyazi.ui.MainViewModel
 import com.ozkan.altyazi.ui.theme.AltyaziTheme
@@ -29,10 +28,8 @@ class MainActivity : AppCompatActivity() {
 
         setContent {
             AltyaziTheme {
-                CameraPermissionGate {
-                    val viewModel: MainViewModel = viewModel()
-                    MainScreen(viewModel)
-                }
+                val viewModel: MainViewModel = viewModel()
+                MainScreen(viewModel)
             }
         }
     }

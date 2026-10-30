@@ -21,6 +21,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -43,7 +44,7 @@ import com.ozkan.altyazi.ui.theme.AppColors
 
 /** Shows [content] once camera permission is granted; otherwise explains why it is needed. */
 @Composable
-fun CameraPermissionGate(content: @Composable () -> Unit) {
+fun CameraPermissionGate(onBack: (() -> Unit)? = null, content: @Composable () -> Unit) {
     val context = LocalContext.current
     fun granted() = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
 
@@ -101,6 +102,10 @@ fun CameraPermissionGate(content: @Composable () -> Unit) {
                 Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }) {
                     Text(stringResource(R.string.permission_grant))
                 }
+            }
+            if (onBack != null) {
+                Spacer(Modifier.height(12.dp))
+                TextButton(onClick = onBack) { Text(stringResource(R.string.source_change)) }
             }
         }
     }

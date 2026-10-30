@@ -41,6 +41,10 @@ class SettingsRepository(context: Context) {
         val roiRight = floatPreferencesKey("roi_right")
         val roiBottom = floatPreferencesKey("roi_bottom")
         val cameraId = stringPreferencesKey("camera_id")
+        val streamRoiLeft = floatPreferencesKey("stream_roi_left")
+        val streamRoiTop = floatPreferencesKey("stream_roi_top")
+        val streamRoiRight = floatPreferencesKey("stream_roi_right")
+        val streamRoiBottom = floatPreferencesKey("stream_roi_bottom")
     }
 
     val settings: Flow<AppSettings> = store.data
@@ -60,6 +64,12 @@ class SettingsRepository(context: Context) {
             this[Keys.roiRight] ?: d.roi.right,
             this[Keys.roiBottom] ?: d.roi.bottom,
         ).takeIf { it.width >= Roi.MIN_SIZE && it.height >= Roi.MIN_SIZE } ?: Roi.DEFAULT
+        val streamRoi = Roi(
+            this[Keys.streamRoiLeft] ?: d.streamRoi.left,
+            this[Keys.streamRoiTop] ?: d.streamRoi.top,
+            this[Keys.streamRoiRight] ?: d.streamRoi.right,
+            this[Keys.streamRoiBottom] ?: d.streamRoi.bottom,
+        ).takeIf { it.width >= Roi.MIN_SIZE && it.height >= Roi.MIN_SIZE } ?: Roi.STREAM_DEFAULT
 
         val source = keyedValueOf(this[Keys.sourceLanguage], d.sourceLanguage)
             .takeIf { it.ocrSupported } ?: d.sourceLanguage
@@ -79,6 +89,7 @@ class SettingsRepository(context: Context) {
             targetLanguage = target,
             quality = keyedValueOf(this[Keys.quality], d.quality),
             roi = roi,
+            streamRoi = streamRoi,
             cameraId = this[Keys.cameraId],
         )
     }
@@ -99,6 +110,10 @@ class SettingsRepository(context: Context) {
         this[Keys.roiTop] = s.roi.top
         this[Keys.roiRight] = s.roi.right
         this[Keys.roiBottom] = s.roi.bottom
+        this[Keys.streamRoiLeft] = s.streamRoi.left
+        this[Keys.streamRoiTop] = s.streamRoi.top
+        this[Keys.streamRoiRight] = s.streamRoi.right
+        this[Keys.streamRoiBottom] = s.streamRoi.bottom
         if (s.cameraId != null) this[Keys.cameraId] = s.cameraId else remove(Keys.cameraId)
     }
 }

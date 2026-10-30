@@ -70,16 +70,21 @@ enum class Quality(
     MAX("max", R.string.quality_max, R.string.quality_max_desc, 6, true, 800),
 }
 
-/** Normalized (0..1) subtitle region relative to the camera frame. */
+/** Normalized (0..1) subtitle region relative to the camera frame or the streamed picture. */
 data class Roi(val left: Float, val top: Float, val right: Float, val bottom: Float) {
     val width get() = right - left
     val height get() = bottom - top
 
     companion object {
         val DEFAULT = Roi(0.08f, 0.70f, 0.92f, 0.96f)
+        /** Where games put subtitles in the console's own picture: the lower fifth, full width. */
+        val STREAM_DEFAULT = Roi(0.05f, 0.74f, 0.95f, 0.97f)
         const val MIN_SIZE = 0.06f
     }
 }
+
+/** Where the subtitles are read from; asked on every launch. */
+enum class FrameSource { CAMERA, REMOTE_PLAY }
 
 data class AppSettings(
     val textSizeSp: Float = 40f,
@@ -95,8 +100,15 @@ data class AppSettings(
     val targetLanguage: Language = Language.TURKISH,
     val quality: Quality = Quality.BEST,
     val roi: Roi = Roi.DEFAULT,
+    /** Subtitle region in the PS5 Remote Play picture (kept apart from the camera's). */
+    val streamRoi: Roi = Roi.STREAM_DEFAULT,
     val cameraId: String? = null,
 ) {
+    fun roiFor(source: FrameSource?): Roi = if (source == FrameSource.REMOTE_PLAY) streamRoi else roi
+
+    fun withRoi(source: FrameSource?, value: Roi): AppSettings =
+        if (source == FrameSource.REMOTE_PLAY) copy(streamRoi = value) else copy(roi = value)
+
     /** Picks a new source; if it collides with the target, the two are swapped. */
     fun withSource(language: Language): AppSettings =
         if (language == targetLanguage) copy(sourceLanguage = language, targetLanguage = sourceLanguage)

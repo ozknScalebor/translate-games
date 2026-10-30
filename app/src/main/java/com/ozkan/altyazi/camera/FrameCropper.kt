@@ -51,4 +51,14 @@ object FrameCropper {
         if (crop !== frame) frame.recycle()
         return crop
     }
+
+    /** Applies the same OCR sizing to an already upright crop (e.g. from the Remote Play stream). */
+    fun scaleForOcr(crop: Bitmap): Bitmap {
+        val upscale = max(1f, MIN_OCR_HEIGHT.toFloat() / crop.height)
+        val scale = min(upscale, MAX_OCR_WIDTH.toFloat() / crop.width)
+        if (scale == 1f) return crop
+        val scaled = Bitmap.createScaledBitmap(crop, (crop.width * scale).roundToInt().coerceAtLeast(1), (crop.height * scale).roundToInt().coerceAtLeast(1), true)
+        if (scaled !== crop) crop.recycle()
+        return scaled
+    }
 }
