@@ -10,6 +10,8 @@ Built for a PS5 → LG webOS TV setup, but it works with any screen and any cons
 
 - **Offline and accurate** — on-device OCR (model bundled in the APK) and on-device translation.
 - **Robust on busy scenes** — each frame is read twice: as captured and as a high-contrast copy that isolates white/yellow subtitle ink from colorful backgrounds. Reads from several frames are then voted on, so one garbled frame can't spoil a line. Digit/letter mix-ups (`1eave`, `G0D`) and ALL-CAPS text are fixed before translation, and `- line - line` dialogue is translated line by line.
+- **Dictionary repair (English)** — on real camera footage OCR gets nearly every letter right but drops word spaces (`sothey swallowthingswhole`, `upa tent`). A 126k-word frequency dictionary restores spacing and fixes one-letter typos instantly; on recorded TV footage this took most committed lines from ~96% to 100% character accuracy. The same dictionary helps pick the better OCR pass.
+- **Optional AI correction (offline)** — uses Gemini Nano through ML Kit GenAI when the device has it, otherwise a small local model (Qwen2.5-0.5B, ~547 MB, downloaded once after consent). It runs once per new subtitle, never per frame; the subtitle is shown immediately and updated in place if the AI finds a fix. Changes that look like paraphrases are rejected.
 - **Speed vs quality setting** — from *Instant* (~150 ms, single pass) to *Max* (~800 ms, 6-frame voting). Default: *Best* (~550 ms).
 - **Selectable languages** — game language: English, Turkish, German, French, Spanish, Italian, Portuguese, Dutch, Polish. Target language: any of those plus Russian, Arabic, Japanese, Korean and Chinese.
 - **Asks before downloading** — if a language pack (≈30 MB) is missing, the app asks first. After that, no network is needed.
@@ -48,9 +50,11 @@ CameraX (1080p, keep-only-latest)
   → FrameCropper       crop the subtitle region on the raw frame, upscale small text
   → SubtitleEnhancer   high-contrast copy isolating white/yellow subtitle ink (dual pass)
   → SubtitleOcr        ML Kit Latin OCR on each pass, drops lines much smaller than the subtitle
-  → SubtitleText       fix digit/letter mix-ups, normalize; ReadScore picks the better pass
+  → SubtitleText       fix digit/letter mix-ups, normalize
+  → SpellingRepair     restore word spacing, fix typos (English dictionary); ReadScore picks the better pass
   → SubtitleStabilizer vote across frames, commit only stable, genuinely new lines
   → OfflineTranslator  sentence-case ALL CAPS, split dialogue, ML Kit Translate, LRU cache
+  → AiCorrection       optional: Gemini Nano / local LLM refines the line in place (CorrectionGuard)
   → Compose UI (+ optional TextToSpeech)
 ```
 
@@ -60,6 +64,7 @@ CameraX (1080p, keep-only-latest)
 | `camera` | Camera discovery and frame cropping |
 | `ocr` | On-device text recognition and high-contrast preprocessing |
 | `translate` | Language pack management and translation |
+| `ai` | Optional on-device AI correction and model download |
 | `tts` | Optional read-aloud |
 | `data` | Settings model and DataStore persistence |
 | `ui` | Jetpack Compose (Material 3) screens and the ViewModel |
@@ -77,6 +82,10 @@ Locally (Android Studio Ladybug+ or JDK 17 with the Android SDK):
 ### Signing
 
 Builds are signed with `keystore/sideload.jks`, committed on purpose so every CI build has the same signature and updates install in place. It is meant for personal sideloading only. Before distributing the app more widely, generate a private key and move it to a GitHub secret.
+
+## Third-party data
+
+`app/src/main/assets/dict/en_words.txt.gz` is the word list from [wordninja](https://github.com/keredson/wordninja) (MIT); see `app/src/main/assets/dict/NOTICE.txt`. The optional local model is [Qwen2.5-0.5B-Instruct](https://huggingface.co/litert-community/Qwen2.5-0.5B-Instruct) (Apache-2.0), downloaded at runtime only if the user enables AI correction.
 
 ## Limitations
 
