@@ -64,8 +64,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete latest --yes --cleanup-tag 2>/dev/null || true
-          gh release create latest dist/*.apk \
+          gh release create latest "dist/SubtitleTranslator-${VERSION}.apk" \
             --title "Subtitle Translator ${VERSION}" \
-            --notes "Built from ${GITHUB_SHA::7}. Install \`SubtitleTranslator-${VERSION}.apk\` on your tablet. The \`-debug\` build is only needed for troubleshooting." \
+            --notes "Built from ${GITHUB_SHA::7}. Install \`SubtitleTranslator-${VERSION}.apk\` on your tablet." \
             --target "${GITHUB_SHA}" \
             --latest

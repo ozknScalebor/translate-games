@@ -19,6 +19,8 @@ android {
         versionName = "1.1.$buildNumber"
         // Only ship the app's own UI languages (drops unused library translations).
         resourceConfigurations += listOf("en", "tr")
+        // Every Android 16 tablet is 64-bit ARM; shipping one ABI cuts the ML Kit native libraries by ~75%.
+        ndk { abiFilters += "arm64-v8a" }
     }
 
     // Fixed signing key: every CI build is signed identically, so updates never require an uninstall.
