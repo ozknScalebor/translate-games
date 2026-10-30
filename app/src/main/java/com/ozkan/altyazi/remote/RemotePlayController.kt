@@ -2,12 +2,8 @@ package com.ozkan.altyazi.remote
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.ImageFormat
-import android.media.Image
-import android.media.ImageReader
-import android.os.Handler
-import android.os.HandlerThread
 import android.os.SystemClock
+import com.ozkan.altyazi.data.Roi
 import com.ozkan.altyazi.remote.chiaki.ChiakiLog
 import com.ozkan.altyazi.remote.chiaki.Codec
 import com.ozkan.altyazi.remote.chiaki.ConnectInfo
@@ -126,24 +122,21 @@ class RemotePlayController(context: Context, private val scope: CoroutineScope) 
     private val _preview = MutableStateFlow<PreviewFrame?>(null)
     val preview: StateFlow<PreviewFrame?> = _preview.asStateFlow()
 
-    /** Called on the frame thread with every decoded frame; the image is closed afterwards. */
-    @Volatile var frameSink: ((Image) -> Unit)? = null
+    /** Called on the GL thread with every decoded frame; the frame can only be read during the call. */
+    @Volatile var frameSink: ((StreamFrame) -> Unit)? = null
 
     private var discovery: DiscoveryService? = null
     private var session: Session? = null
     /** Identifies the current session, so late events from a session that was replaced are ignored. */
     private var sessionToken: Any? = null
-    private var reader: ImageReader? = null
+    private var grabber: GlFrameGrabber? = null
     private var regist: Regist? = null
     private var connectJob: Job? = null
     @Volatile private var userStopped = false
 
-    private val frameThread = HandlerThread("remote-frames").apply { start() }
-    private val frameHandler = Handler(frameThread.looper)
     private var lastPreviewAt = 0L
     private var previewSeq = 0L
     private val previewBuffers = arrayOfNulls<Bitmap>(2)
-    private var previewScratch: IntArray? = null
 
     init {
         // Keep each paired console's last known address, so it can be reached before discovery answers.
@@ -219,22 +212,26 @@ class RemotePlayController(context: Context, private val scope: CoroutineScope) 
     }
 
     private fun openSession(console: SavedConsole, address: String) {
-        val newReader = ImageReader.newInstance(VIDEO_WIDTH, VIDEO_HEIGHT, ImageFormat.YUV_420_888, 3)
-        newReader.setOnImageAvailableListener({ r -> onFrame(r) }, frameHandler)
+        val newGrabber = try {
+            GlFrameGrabber(VIDEO_WIDTH, VIDEO_HEIGHT, ::onFrame)
+        } catch (e: Throwable) {
+            connection.value = Connection.Failed(console, RemoteError.Unsupported)
+            return
+        }
         val profile = ConnectVideoProfile(VIDEO_WIDTH, VIDEO_HEIGHT, VIDEO_FPS, VIDEO_BITRATE, Codec.H265)
         val info = ConnectInfo(Target.fromValue(console.target).isPs5, address, console.registKey, console.rpKey, profile)
         val token = Any()
         val newSession = try {
             Session(info) { event -> scope.launch { if (token === sessionToken) onSessionEvent(console, event) } }
         } catch (e: Throwable) {
-            newReader.close()
+            newGrabber.release()
             connection.value = Connection.Failed(console, if (e is UnsatisfiedLinkError) RemoteError.Unsupported else RemoteError.Other(e.message ?: e.javaClass.simpleName))
             return
         }
-        reader = newReader
+        grabber = newGrabber
         session = newSession
         sessionToken = token
-        newSession.setSurface(newReader.surface)
+        newSession.setSurface(newGrabber.surface)
         val err = newSession.start()
         if (err != 0) {
             connection.value = Connection.Failed(console, RemoteError.Other("start: $err"))
@@ -277,36 +274,29 @@ class RemotePlayController(context: Context, private val scope: CoroutineScope) 
     /** Stops the session off the calling thread: joining it from its own event thread would deadlock. */
     private fun teardownSession() {
         val s = session
-        val r = reader
+        val g = grabber
         session = null
         sessionToken = null
-        reader = null
+        grabber = null
         _preview.value = null
-        if (s == null && r == null) return
+        if (s == null && g == null) return
         Thread({
             runCatching { s?.stop() }
-            runCatching { s?.dispose() }
-            runCatching { r?.close() }
+            runCatching { s?.dispose() } // stops the decoder before its output surface goes away
+            runCatching { g?.release() }
         }, "remote-teardown").start()
     }
 
-    private fun onFrame(r: ImageReader) {
-        val image = try { r.acquireLatestImage() } catch (e: IllegalStateException) { null } ?: return
-        try {
-            frameSink?.invoke(image)
-            val now = SystemClock.uptimeMillis()
-            if (now - lastPreviewAt >= PREVIEW_INTERVAL_MS) {
-                lastPreviewAt = now
-                val slot = (previewSeq % 2).toInt()
-                val (bitmap, scratch) = YuvFrames.preview(image, PREVIEW_STEP, previewBuffers[slot], previewScratch)
-                previewBuffers[slot] = bitmap
-                previewScratch = scratch
-                _preview.value = PreviewFrame(bitmap, previewSeq++)
-            }
-        } catch (e: Throwable) {
-            // A malformed frame is skipped; the next one replaces it.
-        } finally {
-            image.close()
+    /** Runs on the GL thread for every decoded frame. */
+    private fun onFrame(frame: StreamFrame) {
+        frameSink?.invoke(frame)
+        val now = SystemClock.uptimeMillis()
+        if (now - lastPreviewAt >= PREVIEW_INTERVAL_MS) {
+            lastPreviewAt = now
+            val slot = (previewSeq % 2).toInt()
+            val bitmap = frame.read(Roi(0f, 0f, 1f, 1f), PREVIEW_WIDTH, PREVIEW_HEIGHT, previewBuffers[slot])
+            previewBuffers[slot] = bitmap
+            _preview.value = PreviewFrame(bitmap, previewSeq++)
         }
     }
 
@@ -412,6 +402,7 @@ class RemotePlayController(context: Context, private val scope: CoroutineScope) 
         private const val WAKE_REPEAT_MS = 5_000L
         private const val READY_SETTLE_MS = 2_000L
         private const val PREVIEW_INTERVAL_MS = 100L
-        private const val PREVIEW_STEP = 3
+        private const val PREVIEW_WIDTH = 640
+        private const val PREVIEW_HEIGHT = 360
     }
 }

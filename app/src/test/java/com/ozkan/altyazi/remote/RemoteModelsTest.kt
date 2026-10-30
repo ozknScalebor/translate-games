@@ -1,6 +1,5 @@
 package com.ozkan.altyazi.remote
 
-import com.ozkan.altyazi.data.Roi
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -76,20 +75,5 @@ class RemoteModelsTest {
         assertFalse(RemoteKeys.isPairingPin("1234567"))
         assertTrue(RemoteKeys.isLoginPin("0000"))
         assertFalse(RemoteKeys.isLoginPin("00a0"))
-    }
-
-    @Test
-    fun `roi maps to an even-aligned pixel rectangle inside the visible frame`() {
-        val rect = Roi(0.05f, 0.74f, 0.95f, 0.97f).toPixels(0, 0, 1920, 1080)
-        assertEquals(96, rect.x)
-        assertEquals(798, rect.y)
-        assertEquals(1824 - 96, rect.width)
-        assertEquals(1048 - 798, rect.height)
-        assertEquals(0, rect.x % 2)
-        assertEquals(0, rect.y % 2)
-
-        // A decoder frame with padding: offsets are added, the size is clamped to the visible area.
-        val full = Roi(0f, 0f, 1f, 1f).toPixels(8, 4, 1920, 1080)
-        assertEquals(PixelRect(8, 4, 1920, 1080), full)
     }
 }

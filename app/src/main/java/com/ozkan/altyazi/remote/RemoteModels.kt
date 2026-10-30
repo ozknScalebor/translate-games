@@ -1,8 +1,6 @@
 package com.ozkan.altyazi.remote
 
-import com.ozkan.altyazi.data.Roi
 import java.util.Base64
-import kotlin.math.roundToInt
 
 /**
  * A PS5 paired with this tablet. [id] is the console's MAC address (hex), which stays the same when
@@ -94,16 +92,4 @@ object RemoteKeys {
         val parts = text.trim().split('.')
         return parts.size == 4 && parts.all { p -> p.isNotEmpty() && p.length <= 3 && p.all(Char::isDigit) && p.toInt() in 0..255 }
     }
-}
-
-/** Pixel rectangle of [roi] inside a decoded frame whose visible area is [frameWidth]×[frameHeight] at ([left], [top]). */
-data class PixelRect(val x: Int, val y: Int, val width: Int, val height: Int)
-
-fun Roi.toPixels(left: Int, top: Int, frameWidth: Int, frameHeight: Int): PixelRect {
-    // Chroma is subsampled 2×2, so the crop starts on even coordinates.
-    val x = ((this.left * frameWidth).roundToInt().coerceIn(0, frameWidth - 2) and 1.inv())
-    val y = ((this.top * frameHeight).roundToInt().coerceIn(0, frameHeight - 2) and 1.inv())
-    val r = (this.right * frameWidth).roundToInt().coerceIn(x + 2, frameWidth)
-    val b = (this.bottom * frameHeight).roundToInt().coerceIn(y + 2, frameHeight)
-    return PixelRect(left + x, top + y, r - x, b - y)
 }

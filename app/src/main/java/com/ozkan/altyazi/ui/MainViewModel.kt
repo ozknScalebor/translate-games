@@ -3,7 +3,6 @@ package com.ozkan.altyazi.ui
 import android.app.Application
 import android.graphics.Bitmap
 import android.hardware.camera2.CameraManager
-import android.media.Image
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -34,7 +33,7 @@ import com.ozkan.altyazi.data.SettingsRepository
 import com.ozkan.altyazi.ocr.SubtitleEnhancer
 import com.ozkan.altyazi.ocr.SubtitleOcr
 import com.ozkan.altyazi.remote.RemotePlayController
-import com.ozkan.altyazi.remote.YuvFrames
+import com.ozkan.altyazi.remote.StreamFrame
 import com.ozkan.altyazi.translate.ModelState
 import com.ozkan.altyazi.translate.OfflineTranslator
 import com.ozkan.altyazi.tts.Speaker
@@ -279,17 +278,22 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Called on the stream's frame thread. The subtitle region is converted right away (the frame is
-     * recycled as soon as this returns) and read on the analysis thread.
+     * Called on the stream's GL thread. The subtitle region is read back right away (already scaled
+     * for OCR by the GPU) and recognized on the analysis thread.
      */
-    private fun onStreamFrame(image: Image) {
+    private fun onStreamFrame(frame: StreamFrame) {
         if (source != FrameSource.REMOTE_PLAY || paused || !modelReady) return
         val now = SystemClock.elapsedRealtime()
         if (now - lastFrameAt < MIN_FRAME_INTERVAL_MS || !streamBusy.compareAndSet(false, true)) return
         lastFrameAt = now
         val s = settings
         val crop = try {
-            FrameCropper.scaleForOcr(YuvFrames.crop(image, s.streamRoi))
+            val roi = s.streamRoi
+            val (w, h) = FrameCropper.ocrSize(
+                roi.width * RemotePlayController.VIDEO_WIDTH,
+                roi.height * RemotePlayController.VIDEO_HEIGHT,
+            )
+            frame.read(roi, w, h)
         } catch (e: Throwable) {
             streamBusy.set(false)
             return
