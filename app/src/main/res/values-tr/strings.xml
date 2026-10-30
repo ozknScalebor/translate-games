@@ -113,7 +113,7 @@
     <string name="settings_clear_history">Altyazı geçmişini temizle</string>
 
     <string name="ai_title">Yapay zekâ ile çeviri (offline)</string>
-    <string name="ai_desc">Tablette çalışan Gemma 4 dil modeliyle çevirir: daha doğal Türkçe, kalan OCR hatalarını düzeltir, isimleri ve hitapları satırlar arasında tutarlı tutar. Hızlı çeviri önce görünür, yaklaşık bir saniye içinde yapay zekâ çevirisiyle değiştirilir. İnternet, token veya ücret yok.</string>
+    <string name="ai_desc">Tablette çalışan Gemma 4 dil modeliyle çevirir: daha doğal Türkçe, kalan OCR hatalarını düzeltir, isimleri ve hitapları satırlar arasında tutarlı tutar. Her satır model yazdıkça akarak dolar; normal çeviri yalnızca yapay zekâ hata verirse kullanılır. İnternet, token veya ücret yok.</string>
     <string name="ai_status_loading">Model yükleniyor…</string>
     <string name="ai_status_ready_gpu">Hazır · ekran kartında çalışıyor</string>
     <string name="ai_status_ready_cpu">Hazır · işlemcide çalışıyor (daha yavaş)</string>
@@ -125,5 +125,5 @@
     <string name="ai_dialog_title">Yapay zekâ çeviri modeli indirilsin mi?</string>
     <string name="ai_dialog_body">Gemma 4 (yaklaşık %1$s) bir kez indirilir, sonra bu tablette tamamen offline çeviri yapar. Wi-Fi önerilir. İndirme bitene kadar normal offline çeviri çalışmaya devam eder.</string>
     <string name="ai_size_gb">%1$.1f GB</string>
-    <string name="metrics_ai">OCR %1$d ms · Çeviri %2$d ms · Yapay zekâ %3$d ms</string>
+    <string name="metrics_ai">OCR %1$d ms · Yapay zekâ çevirisi %2$d ms</string>
 </resources>

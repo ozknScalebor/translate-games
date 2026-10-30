@@ -54,4 +54,15 @@ class AiPromptTest {
         assertNull(AiPrompt.acceptTranslation("Run!", "Koş! Bu cümle bir karakterin kaçması gerektiğini anlatıyor ve oyunun bu bölümünde tehlike yaklaşıyor."))
         assertNull(AiPrompt.acceptTranslation("Run!", "  "))
     }
+
+    @Test
+    fun `partial replies hide chatty prefixes and opening quotes while streaming`() {
+        assertEquals("Hadi gid", AiPrompt.partial("Here is the translation: \"Hadi gid"))
+        assertEquals("Merhaba", AiPrompt.partial("  Merhaba"))
+    }
+
+    @Test
+    fun `system instruction stays short`() {
+        assertTrue(AiPrompt.systemInstruction("English", "Turkish").length < 260)
+    }
 }

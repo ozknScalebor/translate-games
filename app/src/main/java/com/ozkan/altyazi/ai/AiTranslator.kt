@@ -7,6 +7,7 @@ import com.google.ai.edge.litertlm.Contents
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
+import com.google.ai.edge.litertlm.ExperimentalFlags
 import com.google.ai.edge.litertlm.SamplerConfig
 import com.ozkan.altyazi.core.AiPrompt
 import kotlinx.coroutines.CancellationException
@@ -23,7 +24,8 @@ import kotlinx.coroutines.withContext
 import java.io.Closeable
 import java.io.File
 
-enum class AiBackend { GPU, CPU }
+/** Where the model runs, and whether multi-token-prediction speculative decoding is active. */
+data class AiBackend(val gpu: Boolean, val speculative: Boolean)
 
 sealed interface AiState {
     data object Off : AiState
@@ -41,7 +43,10 @@ sealed interface AiState {
  * Chosen because it gave the best translation quality among small local models in an independent
  * game-text benchmark, while decoding ~50 tokens/s with a 0.3 s time-to-first-token on a current
  * flagship GPU. It also repairs leftover OCR mistakes in the same pass and uses the previous lines
- * as context. The engine runs on the GPU when available and falls back to the CPU.
+ * as context. The engine runs on the GPU when available and falls back to the CPU, with Gemma 4's
+ * MTP drafter (speculative decoding) enabled when the runtime accepts it — measured elsewhere at
+ * ~20% lower sentence latency for translation with unchanged quality. Replies are streamed so the
+ * first words can be shown about half a second after a subtitle is committed.
  *
  * The model (~2.6 GB) is downloaded once after the user agrees. There are no tokens, quotas or
  * costs: everything runs on the tablet.
@@ -96,14 +101,17 @@ class AiTranslator(context: Context, private val scope: CoroutineScope) : Closea
     }
 
     /**
-     * Translates one subtitle. Returns null when the engine is not ready, fails, or replies with
-     * something that does not look like a translation (callers then keep the ML Kit translation).
+     * Translates one subtitle, streaming partial text to [onPartial] as it is generated.
+     * Returns null when the engine is not ready, fails, or replies with something that does not look
+     * like a translation (callers then fall back to the regular translator).
+     * Cancelling the calling coroutine stops collection and closes the conversation.
      */
     suspend fun translate(
         subtitle: String,
         sourceLanguage: String,
         targetLanguage: String,
         context: List<AiPrompt.ContextLine>,
+        onPartial: (String) -> Unit = {},
     ): String? {
         if (_state.value !is AiState.Ready) return null
         return engineLock.withLock {
@@ -118,7 +126,12 @@ class AiTranslator(context: Context, private val scope: CoroutineScope) : Closea
                         )
                     )
                     try {
-                        conversation.sendMessage(AiPrompt.userMessage(subtitle, context)).toString()
+                        val reply = StringBuilder()
+                        conversation.sendMessageAsync(AiPrompt.userMessage(subtitle, context)).collect { chunk ->
+                            reply.append(chunk.toString())
+                            onPartial(AiPrompt.partial(reply.toString()))
+                        }
+                        reply.toString()
                     } finally {
                         conversation.close()
                     }
@@ -134,28 +147,53 @@ class AiTranslator(context: Context, private val scope: CoroutineScope) : Closea
 
     private suspend fun load() {
         _state.value = AiState.Loading
-        val loaded = createEngine(Backend.GPU())?.let { it to AiBackend.GPU }
-            ?: createEngine(Backend.CPU())?.let { it to AiBackend.CPU }
+        // Fastest first: GPU + speculative decoding, then without the drafter, then the CPU.
+        val attempts = listOf(
+            AiBackend(gpu = true, speculative = true),
+            AiBackend(gpu = true, speculative = false),
+            AiBackend(gpu = false, speculative = true),
+            AiBackend(gpu = false, speculative = false),
+        )
+        var loaded: Pair<Engine, AiBackend>? = null
+        for (attempt in attempts) {
+            val e = createEngine(if (attempt.gpu) Backend.GPU() else Backend.CPU(), attempt.speculative) ?: continue
+            loaded = e to attempt
+            break
+        }
         if (loaded == null) {
             _state.value = AiState.Failed("Model could not be loaded")
             return
         }
         engineLock.withLock { engine = loaded.first }
         _state.value = AiState.Ready(loaded.second)
+        warmUp()
     }
 
-    private suspend fun createEngine(backend: Backend): Engine? = withContext(Dispatchers.IO) {
+    /** The first inference compiles GPU kernels; doing it now keeps the first real subtitle fast. */
+    private suspend fun warmUp() {
+        runCatching { translate("Hello there.", "English", "Turkish", emptyList()) }
+    }
+
+    private suspend fun createEngine(backend: Backend, speculative: Boolean): Engine? = withContext(Dispatchers.IO) {
+        var candidate: Engine? = null
         try {
-            Engine(
+            // Read when the engine is constructed; throws at initialize() if the model has no drafter.
+            ExperimentalFlags.enableSpeculativeDecoding = speculative
+            candidate = Engine(
                 EngineConfig(
                     modelPath = modelFile.absolutePath,
                     backend = backend,
                     cacheDir = appContext.cacheDir.path,
                 )
-            ).also { it.initialize() }
+            )
+            candidate.initialize()
+            candidate
         } catch (e: CancellationException) {
+            runCatching { candidate?.close() }
             throw e
         } catch (e: Throwable) {
+            // A failed attempt must not keep native memory (GPU buffers) alive.
+            runCatching { candidate?.close() }
             null
         }
     }

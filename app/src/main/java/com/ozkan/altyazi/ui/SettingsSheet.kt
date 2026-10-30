@@ -63,7 +63,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.os.LocaleListCompat
 import com.ozkan.altyazi.R
-import com.ozkan.altyazi.ai.AiBackend
 import com.ozkan.altyazi.ai.AiState
 import com.ozkan.altyazi.data.AppSettings
 import com.ozkan.altyazi.data.Language
@@ -223,7 +222,7 @@ private fun AiStatus(state: AiState, onDownload: () -> Unit, onRetry: () -> Unit
             AiState.Off -> null
             AiState.Loading -> stringResource(R.string.ai_status_loading)
             is AiState.Ready -> stringResource(
-                if (state.backend == AiBackend.GPU) R.string.ai_status_ready_gpu else R.string.ai_status_ready_cpu
+                if (state.backend.gpu) R.string.ai_status_ready_gpu else R.string.ai_status_ready_cpu
             )
             is AiState.NeedsDownload -> stringResource(R.string.ai_status_needs_download, sizeText(state.sizeMb))
             is AiState.Downloading -> state.progress?.let { stringResource(R.string.ai_status_downloading, (it * 100).roundToInt()) }

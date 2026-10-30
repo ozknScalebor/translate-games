@@ -47,10 +47,20 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-/** [refined] marks a line whose translation was replaced by the on-device AI after it was first shown. */
-data class SubtitleLine(val id: Long, val original: String, val translated: String, val refined: Boolean = false)
+/**
+ * One subtitle in the transcript. [refined] marks a line translated by the on-device AI;
+ * [pending] means its translation is still being generated (typing indicator).
+ */
+data class SubtitleLine(
+    val id: Long,
+    val original: String,
+    val translated: String,
+    val refined: Boolean = false,
+    val pending: Boolean = false,
+)
 
-data class Metrics(val ocrMs: Long, val translateMs: Long, val aiMs: Long? = null)
+/** Last subtitle's timings; [translateMs] is null when the line was translated by the AI. */
+data class Metrics(val ocrMs: Long, val translateMs: Long?, val aiMs: Long? = null)
 
 data class UiState(
     val settings: AppSettings = AppSettings(),
@@ -245,7 +255,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
         val ocrMs = SystemClock.elapsedRealtime() - started
 
-        stabilizer.requiredHits = s.quality.requiredReads
+        // The AI fixes leftover OCR mistakes itself, so it can start from an earlier, 2-frame read.
+        stabilizer.requiredHits = if (aiActive()) minOf(s.quality.requiredReads, AI_REQUIRED_READS) else s.quality.requiredReads
         when (val event = stabilizer.accept(if (SubtitleText.isMeaningful(read.text)) read else Read.EMPTY)) {
             is SubtitleStabilizer.Event.Commit -> onCommit(event.text, ocrMs)
             SubtitleStabilizer.Event.Cleared -> _ui.update { it.copy(subtitleOnScreen = false) }
@@ -275,69 +286,96 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private fun onCommit(text: String, ocrMs: Long) {
         viewModelScope.launch {
             translateJob?.cancel() // a newer subtitle makes the pending translation obsolete
+            aiJob?.cancel()
+            val id = lineIdFor(text)
+            if (aiActive()) {
+                aiJob = launch { translateWithAi(id, text, ocrMs) }
+                return@launch
+            }
             translateJob = launch {
-                val started = SystemClock.elapsedRealtime()
-                val translated = try {
-                    translate(text)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    return@launch
-                }
-                val translateMs = SystemClock.elapsedRealtime() - started
-
-                val newLine = SubtitleLine(nextLineId++, text, translated)
-                _ui.update { state ->
-                    state.copy(
-                        lines = (listOf(newLine) + state.lines).take(HISTORY_LIMIT),
-                        subtitleOnScreen = true,
-                        metrics = Metrics(ocrMs, translateMs),
-                    )
-                }
-                translateWithAi(newLine)
+                val translated = translateFast(text) ?: return@launch
+                showLine(SubtitleLine(id, text, translated.first), Metrics(ocrMs, translated.second))
+                if (settings.speak) speaker.speak(translated.first)
             }
         }
     }
 
+    private fun aiActive() = settings.aiTranslation && ai.state.value is AiState.Ready
+
     /**
-     * AI translation with progressive replacement: the ML Kit translation is already on screen; the
-     * on-device LLM's translation replaces it in place when it arrives (typically ~1 s). If the model
-     * is not ready, times out or returns something implausible, the ML Kit line simply stays.
-     * A newer subtitle cancels the pending request so work never piles up.
+     * Typewriter-style subtitles grow in place: if the committed text extends the latest line, that
+     * line is reused instead of stacking a near-duplicate in the history.
      */
-    private fun translateWithAi(line: SubtitleLine) {
-        aiJob?.cancel()
+    private fun lineIdFor(text: String): Long {
+        val last = _ui.value.lines.firstOrNull() ?: return nextLineId++
+        val prev = last.original
+        val extends = text.length > prev.length &&
+            text.startsWith(prev.take((prev.length * 0.8).toInt().coerceAtLeast(4)), ignoreCase = true)
+        return if (extends) last.id else nextLineId++
+    }
+
+    /** Inserts [line], or replaces the line with the same id (typewriter extension / streaming). */
+    private fun showLine(line: SubtitleLine, metrics: Metrics? = null) {
+        _ui.update { state ->
+            val replaced = state.lines.any { it.id == line.id }
+            state.copy(
+                lines = if (replaced) state.lines.map { if (it.id == line.id) line else it }
+                else (listOf(line) + state.lines).take(HISTORY_LIMIT),
+                subtitleOnScreen = true,
+                metrics = metrics ?: state.metrics,
+            )
+        }
+    }
+
+    /** ML Kit translation; returns the text and its duration, or null on failure. */
+    private suspend fun translateFast(text: String): Pair<String, Long>? {
+        val started = SystemClock.elapsedRealtime()
+        return try {
+            translate(text) to (SystemClock.elapsedRealtime() - started)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * AI-only translation: the line appears right away with a typing indicator and fills in as the
+     * on-device model streams its reply (first words after ~0.5 s). No fast translation is shown
+     * first, so the line never visibly "corrects" itself. Only if the model fails, times out or
+     * replies with something implausible does the regular offline translator fill the line instead.
+     * A newer subtitle cancels this job, which also stops generation.
+     */
+    private suspend fun translateWithAi(id: Long, text: String, ocrMs: Long) {
         val s = settings
-        if (!s.aiTranslation || ai.state.value !is AiState.Ready) {
-            if (s.speak) speaker.speak(line.translated)
+        val started = SystemClock.elapsedRealtime()
+        showLine(SubtitleLine(id, text, translated = "", pending = true))
+
+        val english = s.sourceLanguage == Language.ENGLISH
+        val speakerLine = SubtitleText.splitSpeaker(text)
+        val body = SubtitleText.toSentenceCase(speakerLine.body, english)
+        val reply = withTimeoutOrNull(AI_TIMEOUT_MS) {
+            ai.translate(body, s.sourceLanguage.englishName(), s.targetLanguage.englishName(), aiContext.toList()) { partial ->
+                if (partial.isNotEmpty()) {
+                    showLine(SubtitleLine(id, text, speakerLine.format(partial), refined = true, pending = true))
+                }
+            }
+        }
+
+        if (reply == null) {
+            val fallback = translateFast(text) ?: return
+            showLine(SubtitleLine(id, text, fallback.first), Metrics(ocrMs, fallback.second))
+            if (s.speak) speaker.speak(fallback.first)
             return
         }
-        aiJob = viewModelScope.launch {
-            val started = SystemClock.elapsedRealtime()
-            val english = s.sourceLanguage == Language.ENGLISH
-            val speakerLine = SubtitleText.splitSpeaker(line.original)
-            val body = SubtitleText.toSentenceCase(speakerLine.body, english)
-            val reply = withTimeoutOrNull(AI_TIMEOUT_MS) {
-                ai.translate(body, s.sourceLanguage.englishName(), s.targetLanguage.englishName(), aiContext.toList())
-            }
-            if (reply == null) {
-                if (s.speak) speaker.speak(line.translated)
-                return@launch
-            }
-            val translated = speakerLine.format(reply)
-            val aiMs = SystemClock.elapsedRealtime() - started
 
-            aiContext.addLast(AiPrompt.ContextLine(line.original, translated))
-            while (aiContext.size > AI_CONTEXT_LINES) aiContext.removeFirst()
+        val translated = speakerLine.format(reply)
+        val aiMs = SystemClock.elapsedRealtime() - started
+        aiContext.addLast(AiPrompt.ContextLine(text, translated))
+        while (aiContext.size > AI_CONTEXT_LINES) aiContext.removeFirst()
 
-            _ui.update { state ->
-                state.copy(
-                    lines = state.lines.map { if (it.id == line.id) it.copy(translated = translated, refined = true) else it },
-                    metrics = state.metrics?.copy(aiMs = aiMs),
-                )
-            }
-            if (s.speak) speaker.speak(translated)
-        }
+        showLine(SubtitleLine(id, text, translated, refined = true), Metrics(ocrMs, null, aiMs))
+        if (s.speak) speaker.speak(translated)
     }
 
     private fun com.ozkan.altyazi.data.Language.englishName(): String =
@@ -419,8 +457,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         /** At most ~8 OCR passes per second: catches subtitles instantly without heating the tablet. */
         const val MIN_FRAME_INTERVAL_MS = 120L
         const val HISTORY_LIMIT = 500
-        const val AI_TIMEOUT_MS = 8_000L
-        const val AI_CONTEXT_LINES = 3
+        const val AI_TIMEOUT_MS = 6_000L
+        const val AI_CONTEXT_LINES = 2
+        const val AI_REQUIRED_READS = 2
         const val DICTIONARY_ASSET = "dict/en_words.txt.gz"
     }
 }

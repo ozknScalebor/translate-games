@@ -125,7 +125,7 @@
 
     <!-- AI translation -->
     <string name="ai_title">AI translation (offline)</string>
-    <string name="ai_desc">Translates with Gemma 4, a language model running on this tablet: more natural phrasing, fixes leftover OCR mistakes and keeps names and tone consistent across lines. The quick translation appears first and is replaced in about a second. No internet, tokens or costs.</string>
+    <string name="ai_desc">Translates with Gemma 4, a language model running on this tablet: more natural phrasing, fixes leftover OCR mistakes and keeps names and tone consistent across lines. Each line types itself in as the model writes it; the regular translator is only used if the AI fails. No internet, tokens or costs.</string>
     <string name="ai_status_loading">Loading the model…</string>
     <string name="ai_status_ready_gpu">Ready · running on the GPU</string>
     <string name="ai_status_ready_cpu">Ready · running on the CPU (slower)</string>
@@ -137,5 +137,5 @@
     <string name="ai_dialog_title">Download the AI translation model?</string>
     <string name="ai_dialog_body">Gemma 4 (about %1$s) is downloaded once and then translates fully offline on this tablet. Wi-Fi is recommended. Until it finishes, the regular offline translation keeps working.</string>
     <string name="ai_size_gb">%1$.1f GB</string>
-    <string name="metrics_ai">OCR %1$d ms · Translation %2$d ms · AI %3$d ms</string>
+    <string name="metrics_ai">OCR %1$d ms · AI translation %2$d ms</string>
 </resources>

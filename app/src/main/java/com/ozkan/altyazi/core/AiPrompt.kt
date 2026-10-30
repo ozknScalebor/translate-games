@@ -11,13 +11,11 @@ object AiPrompt {
 
     data class ContextLine(val source: String, val translation: String)
 
+    /** Kept short on purpose: every token here is prefilled for each subtitle. */
     fun systemInstruction(sourceLanguage: String, targetLanguage: String): String =
-        "You translate video game and TV subtitles from $sourceLanguage to $targetLanguage. " +
-            "The $sourceLanguage text was read from a camera image by OCR and may contain spacing, " +
-            "spelling or punctuation mistakes; silently correct them. " +
-            "Translate naturally, the way a native $targetLanguage speaker would say it in a game " +
-            "or show, and keep it as short as a subtitle. Keep character names unchanged. " +
-            "Reply with the $targetLanguage translation only: no quotes, notes or explanations."
+        "Translate game/TV subtitles from $sourceLanguage to natural, concise $targetLanguage. " +
+            "The input comes from OCR and may have spacing or spelling errors; fix them silently. " +
+            "Keep names unchanged. Reply with the translation only."
 
     fun userMessage(subtitle: String, context: List<ContextLine>): String = buildString {
         if (context.isNotEmpty()) {
@@ -27,6 +25,17 @@ object AiPrompt {
         }
         append("Subtitle to translate:\n").append(subtitle)
     }
+
+    /**
+     * Cleans a partial streamed reply for display while it is still being generated: strips a
+     * chatty prefix or opening quote as soon as it appears and caps the number of lines.
+     */
+    fun partial(reply: String): String =
+        reply.trimStart()
+            .replace(chattyPrefix, "")
+            .trimStart('"', '“', '«', ' ')
+            .lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.take(MAX_LINES)
+            .joinToString("\n")
 
     private val chattyPrefix = Regex(
         "^(here(?:'s| is)[^:]*:|translation:|translated:|çeviri:|türkçe:|sure[,!]?)\\s*",

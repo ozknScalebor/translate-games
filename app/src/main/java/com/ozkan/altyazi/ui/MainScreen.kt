@@ -213,8 +213,8 @@ private fun CameraFooter(state: UiState) {
         Spacer(Modifier.weight(1f))
         state.metrics?.let {
             Text(
-                if (it.aiMs != null) stringResource(R.string.metrics_ai, it.ocrMs.toInt(), it.translateMs.toInt(), it.aiMs.toInt())
-                else stringResource(R.string.metrics, it.ocrMs.toInt(), it.translateMs.toInt()),
+                if (it.aiMs != null) stringResource(R.string.metrics_ai, it.ocrMs.toInt(), it.aiMs.toInt())
+                else stringResource(R.string.metrics, it.ocrMs.toInt(), (it.translateMs ?: 0L).toInt()),
                 style = MaterialTheme.typography.bodySmall,
                 color = AppColors.TextSecondary,
             )
