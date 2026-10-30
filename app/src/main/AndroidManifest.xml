@@ -29,6 +29,10 @@
             android:name="com.google.mlkit.vision.DEPENDENCIES"
             android:value="ocr" />
 
+        <!-- GPU backend for on-device LLM translation (optional on devices without OpenCL) -->
+        <uses-native-library android:name="libvndksupport.so" android:required="false" />
+        <uses-native-library android:name="libOpenCL.so" android:required="false" />
+
         <!-- Lets AppCompat persist the per-app language on Android 12 and below -->
         <service
             android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"

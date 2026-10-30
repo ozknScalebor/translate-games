@@ -37,6 +37,12 @@ jobs:
           chmod +x gradlew
           ./gradlew testDebugUnitTest assembleRelease assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
 
+      - name: Report resolved LiteRT-LM version
+        if: success()
+        run: |
+          v=$(./gradlew -q :app:dependencies --configuration releaseRuntimeClasspath --no-daemon | grep -o 'litertlm-android:[^ ]*' | head -1)
+          echo "::notice::resolved ${v}"
+
       - name: Surface build errors
         if: failure()
         run: |

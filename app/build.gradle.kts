@@ -91,9 +91,8 @@ dependencies {
     implementation("com.google.mlkit:text-recognition:16.0.1")
     implementation("com.google.mlkit:translate:17.0.3")
 
-    // Optional AI correction: Gemini Nano via ML Kit GenAI (system model) or a small local LLM
-    implementation("com.google.mlkit:genai-proofreading:1.0.0-beta1")
-    implementation("com.google.mediapipe:tasks-genai:0.10.27")
+    // Optional offline AI translation: Gemma 4 E2B on LiteRT-LM (GPU with CPU fallback)
+    implementation("com.google.ai.edge.litertlm:litertlm-android:latest.release")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
 

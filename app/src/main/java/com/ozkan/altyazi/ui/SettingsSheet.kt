@@ -189,9 +189,9 @@ fun SettingsSheet(
             }
 
             Spacer(Modifier.height(8.dp))
-            SwitchRow(stringResource(R.string.ai_title), settings.aiCorrection) { v -> onUpdate { it.copy(aiCorrection = v) } }
+            SwitchRow(stringResource(R.string.ai_title), settings.aiTranslation) { v -> onUpdate { it.copy(aiTranslation = v) } }
             Hint(stringResource(R.string.ai_desc))
-            if (settings.aiCorrection) AiStatus(aiState, onAiDownload, onAiRetry)
+            if (settings.aiTranslation) AiStatus(aiState, onAiDownload, onAiRetry)
 
             Label(stringResource(R.string.settings_app_language))
             AppLanguagePicker()
@@ -214,18 +214,22 @@ fun SettingsSheet(
 }
 
 @Composable
+private fun sizeText(mb: Int): String = stringResource(R.string.ai_size_gb, mb / 1024f)
+
+@Composable
 private fun AiStatus(state: AiState, onDownload: () -> Unit, onRetry: () -> Unit) {
     Column(Modifier.padding(top = 10.dp)) {
         val text = when (state) {
             AiState.Off -> null
-            AiState.Checking -> stringResource(R.string.ai_status_checking)
+            AiState.Loading -> stringResource(R.string.ai_status_loading)
             is AiState.Ready -> stringResource(
-                if (state.backend == AiBackend.GEMINI_NANO) R.string.ai_status_gemini else R.string.ai_status_local
+                if (state.backend == AiBackend.GPU) R.string.ai_status_ready_gpu else R.string.ai_status_ready_cpu
             )
-            is AiState.NeedsDownload -> stringResource(R.string.ai_status_needs_download, state.sizeMb)
+            is AiState.NeedsDownload -> stringResource(R.string.ai_status_needs_download, sizeText(state.sizeMb))
             is AiState.Downloading -> state.progress?.let { stringResource(R.string.ai_status_downloading, (it * 100).roundToInt()) }
                 ?: stringResource(R.string.ai_status_downloading_indeterminate)
             is AiState.Failed -> stringResource(R.string.ai_status_failed, state.reason)
+            is AiState.NotEnoughStorage -> stringResource(R.string.ai_status_storage, sizeText(state.neededMb), sizeText(state.freeMb))
         }
         if (text != null) {
             Text(
@@ -233,7 +237,7 @@ private fun AiStatus(state: AiState, onDownload: () -> Unit, onRetry: () -> Unit
                 style = MaterialTheme.typography.bodySmall,
                 color = when (state) {
                     is AiState.Ready -> AppColors.Success
-                    is AiState.Failed -> AppColors.Danger
+                    is AiState.Failed, is AiState.NotEnoughStorage -> AppColors.Danger
                     else -> AppColors.TextSecondary
                 },
             )
@@ -245,12 +249,16 @@ private fun AiStatus(state: AiState, onDownload: () -> Unit, onRetry: () -> Unit
                 if (progress != null) LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
                 else LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
+            AiState.Loading -> {
+                Spacer(Modifier.height(8.dp))
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
             is AiState.NeedsDownload -> OutlinedButton(onClick = onDownload, modifier = Modifier.padding(top = 8.dp)) {
                 Icon(Icons.Rounded.Download, null, Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.action_download))
             }
-            is AiState.Failed -> OutlinedButton(onClick = onRetry, modifier = Modifier.padding(top = 8.dp)) {
+            is AiState.Failed, is AiState.NotEnoughStorage -> OutlinedButton(onClick = onRetry, modifier = Modifier.padding(top = 8.dp)) {
                 Text(stringResource(R.string.action_retry))
             }
             else -> Unit

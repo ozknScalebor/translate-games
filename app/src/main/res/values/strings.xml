@@ -123,17 +123,19 @@
     <string name="history_jump">Jump to latest subtitle</string>
     <string name="settings_clear_history">Clear subtitle history</string>
 
-    <!-- AI correction -->
-    <string name="ai_title">AI correction (offline)</string>
-    <string name="ai_desc">Fixes OCR mistakes with an on-device model. The subtitle appears immediately and is updated in place when the AI finds a fix.</string>
-    <string name="ai_status_checking">Checking this device…</string>
-    <string name="ai_status_gemini">Using Gemini Nano on this device</string>
-    <string name="ai_status_local">Using the local model (Qwen2.5 0.5B)</string>
-    <string name="ai_status_needs_download">The local model needs a one-time download (%1$d MB)</string>
+    <!-- AI translation -->
+    <string name="ai_title">AI translation (offline)</string>
+    <string name="ai_desc">Translates with Gemma 4, a language model running on this tablet: more natural phrasing, fixes leftover OCR mistakes and keeps names and tone consistent across lines. The quick translation appears first and is replaced in about a second. No internet, tokens or costs.</string>
+    <string name="ai_status_loading">Loading the model…</string>
+    <string name="ai_status_ready_gpu">Ready · running on the GPU</string>
+    <string name="ai_status_ready_cpu">Ready · running on the CPU (slower)</string>
+    <string name="ai_status_needs_download">The model needs a one-time download (%1$s)</string>
     <string name="ai_status_downloading">Downloading model… %1$d%%</string>
     <string name="ai_status_downloading_indeterminate">Downloading model…</string>
     <string name="ai_status_failed">AI unavailable: %1$s</string>
-    <string name="ai_dialog_title">Download AI model?</string>
-    <string name="ai_dialog_body">This device has no built-in AI model, so a small offline model (Qwen2.5 0.5B, about %1$d MB) is needed. It is downloaded once, Wi-Fi recommended, and then runs fully offline.</string>
-    <string name="ai_refined">Corrected by AI</string>
+    <string name="ai_status_storage">Not enough storage: %1$s needed, %2$s free</string>
+    <string name="ai_dialog_title">Download the AI translation model?</string>
+    <string name="ai_dialog_body">Gemma 4 (about %1$s) is downloaded once and then translates fully offline on this tablet. Wi-Fi is recommended. Until it finishes, the regular offline translation keeps working.</string>
+    <string name="ai_size_gb">%1$.1f GB</string>
+    <string name="metrics_ai">OCR %1$d ms · Translation %2$d ms · AI %3$d ms</string>
 </resources>

@@ -12,13 +12,13 @@ import androidx.camera.core.ImageProxy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.ozkan.altyazi.ai.AiCorrection
+import com.ozkan.altyazi.ai.AiTranslator
 import com.ozkan.altyazi.ai.AiState
 import com.ozkan.altyazi.camera.CameraSource
 import com.ozkan.altyazi.camera.CameraSources
 import com.ozkan.altyazi.camera.awaitCameraProvider
 import com.ozkan.altyazi.camera.FrameCropper
-import com.ozkan.altyazi.core.CorrectionGuard
+import com.ozkan.altyazi.core.AiPrompt
 import com.ozkan.altyazi.core.Read
 import com.ozkan.altyazi.core.SpellingRepair
 import com.ozkan.altyazi.core.SubtitleStabilizer
@@ -47,10 +47,10 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-/** [refined] marks a line whose text was improved by the on-device AI after it was first shown. */
+/** [refined] marks a line whose translation was replaced by the on-device AI after it was first shown. */
 data class SubtitleLine(val id: Long, val original: String, val translated: String, val refined: Boolean = false)
 
-data class Metrics(val ocrMs: Long, val translateMs: Long)
+data class Metrics(val ocrMs: Long, val translateMs: Long, val aiMs: Long? = null)
 
 data class UiState(
     val settings: AppSettings = AppSettings(),
@@ -85,7 +85,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val translator = OfflineTranslator(viewModelScope)
     private val speaker = Speaker(app)
     private val stabilizer = SubtitleStabilizer()
-    private val ai = AiCorrection(app, viewModelScope)
+    private val ai = AiTranslator(app, viewModelScope)
+
+    /** Recent AI translations given to the model as context (names, tone, forms of address). */
+    private val aiContext = ArrayDeque<AiPrompt.ContextLine>()
 
     /** English dictionary for OCR repair; loaded once in the background (~0.5 MB asset). */
     @Volatile private var dictionary: WordDictionary? = null
@@ -128,9 +131,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 if (first || previous.targetLanguage != s.targetLanguage) speaker.setLanguage(s.targetLanguage.key)
                 if (first || previous.speak != s.speak) speaker.setEnabled(s.speak)
-                if (first || previous.aiCorrection != s.aiCorrection || previous.sourceLanguage != s.sourceLanguage) {
-                    if (s.aiCorrection) ai.enable(s.sourceLanguage) else ai.disable()
+                if (first || previous.aiTranslation != s.aiTranslation) {
+                    if (s.aiTranslation) ai.enable() else ai.disable()
                 }
+                if (pairChanged) aiContext.clear()
                 if (previous.roi != s.roi) stabilizer.reset()
                 _ui.update { it.copy(settings = s, settingsLoaded = true) }
                 if (first || previous.cameraId != s.cameraId) chooseCamera()
@@ -148,7 +152,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 _ui.update {
                     it.copy(
                         aiState = state,
-                        showAiDownloadPrompt = state is AiState.NeedsDownload && settings.aiCorrection,
+                        showAiDownloadPrompt = state is AiState.NeedsDownload && settings.aiTranslation,
                     )
                 }
             }
@@ -290,37 +294,54 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         metrics = Metrics(ocrMs, translateMs),
                     )
                 }
-                if (settings.speak) speaker.speak(translated)
-                refineWithAi(newLine)
+                translateWithAi(newLine)
             }
         }
     }
 
     /**
-     * Progressive refinement: the line is already on screen; if the on-device AI finds a genuine OCR
-     * fix, the line is re-translated and updated in place. A newer subtitle cancels this work so the
-     * tablet never queues up AI calls.
+     * AI translation with progressive replacement: the ML Kit translation is already on screen; the
+     * on-device LLM's translation replaces it in place when it arrives (typically ~1 s). If the model
+     * is not ready, times out or returns something implausible, the ML Kit line simply stays.
+     * A newer subtitle cancels the pending request so work never piles up.
      */
-    private fun refineWithAi(line: SubtitleLine) {
+    private fun translateWithAi(line: SubtitleLine) {
         aiJob?.cancel()
-        if (ai.state.value !is AiState.Ready) return
+        val s = settings
+        if (!s.aiTranslation || ai.state.value !is AiState.Ready) {
+            if (s.speak) speaker.speak(line.translated)
+            return
+        }
         aiJob = viewModelScope.launch {
-            val suggestion = withTimeoutOrNull(AI_TIMEOUT_MS) { ai.correct(line.original) } ?: return@launch
-            val corrected = CorrectionGuard.accept(line.original, suggestion) ?: return@launch
-            val translated = try {
-                translate(corrected)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
+            val started = SystemClock.elapsedRealtime()
+            val english = s.sourceLanguage == Language.ENGLISH
+            val speakerLine = SubtitleText.splitSpeaker(line.original)
+            val body = SubtitleText.toSentenceCase(speakerLine.body, english)
+            val reply = withTimeoutOrNull(AI_TIMEOUT_MS) {
+                ai.translate(body, s.sourceLanguage.englishName(), s.targetLanguage.englishName(), aiContext.toList())
+            }
+            if (reply == null) {
+                if (s.speak) speaker.speak(line.translated)
                 return@launch
             }
+            val translated = speakerLine.format(reply)
+            val aiMs = SystemClock.elapsedRealtime() - started
+
+            aiContext.addLast(AiPrompt.ContextLine(line.original, translated))
+            while (aiContext.size > AI_CONTEXT_LINES) aiContext.removeFirst()
+
             _ui.update { state ->
-                state.copy(lines = state.lines.map {
-                    if (it.id == line.id) it.copy(original = corrected, translated = translated, refined = true) else it
-                })
+                state.copy(
+                    lines = state.lines.map { if (it.id == line.id) it.copy(translated = translated, refined = true) else it },
+                    metrics = state.metrics?.copy(aiMs = aiMs),
+                )
             }
+            if (s.speak) speaker.speak(translated)
         }
     }
+
+    private fun com.ozkan.altyazi.data.Language.englishName(): String =
+        java.util.Locale.forLanguageTag(key).getDisplayLanguage(java.util.Locale.ENGLISH)
 
     /**
      * Prepares the text for the translation model: the speaker name is kept as-is, ALL-CAPS text is
@@ -355,19 +376,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun confirmAiDownload() {
         _ui.update { it.copy(showAiDownloadPrompt = false) }
-        ai.downloadLocalModel()
+        ai.download()
     }
 
     fun dismissAiDownload() {
         _ui.update { it.copy(showAiDownloadPrompt = false) }
-        updateSettings { it.copy(aiCorrection = false) }
+        updateSettings { it.copy(aiTranslation = false) }
     }
 
     fun requestAiDownload() = _ui.update { it.copy(showAiDownloadPrompt = true) }
 
     fun retryAi() {
         ai.disable()
-        ai.enable(settings.sourceLanguage)
+        ai.enable()
     }
 
     fun clearHistory() = _ui.update { it.copy(lines = emptyList(), subtitleOnScreen = false) }
@@ -398,7 +419,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         /** At most ~8 OCR passes per second: catches subtitles instantly without heating the tablet. */
         const val MIN_FRAME_INTERVAL_MS = 120L
         const val HISTORY_LIMIT = 500
-        const val AI_TIMEOUT_MS = 4_000L
+        const val AI_TIMEOUT_MS = 8_000L
+        const val AI_CONTEXT_LINES = 3
         const val DICTIONARY_ASSET = "dict/en_words.txt.gz"
     }
 }

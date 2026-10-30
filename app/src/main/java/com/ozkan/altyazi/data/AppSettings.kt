@@ -89,8 +89,8 @@ data class AppSettings(
     val background: PanelBackground = PanelBackground.SOFT,
     val showOriginal: Boolean = true,
     val speak: Boolean = false,
-    /** Optional on-device AI correction of OCR text (off by default). */
-    val aiCorrection: Boolean = false,
+    /** Optional offline AI translation with an on-device LLM (off by default). */
+    val aiTranslation: Boolean = false,
     val sourceLanguage: Language = Language.ENGLISH,
     val targetLanguage: Language = Language.TURKISH,
     val quality: Quality = Quality.BEST,

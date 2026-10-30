@@ -112,16 +112,18 @@
     <string name="history_jump">Son altyazıya git</string>
     <string name="settings_clear_history">Altyazı geçmişini temizle</string>
 
-    <string name="ai_title">Yapay zekâ ile düzelt (offline)</string>
-    <string name="ai_desc">OCR hatalarını cihaz üstündeki bir modelle düzeltir. Altyazı hemen görünür; yapay zekâ bir düzeltme bulursa aynı satır güncellenir.</string>
-    <string name="ai_status_checking">Cihaz kontrol ediliyor…</string>
-    <string name="ai_status_gemini">Bu cihazdaki Gemini Nano kullanılıyor</string>
-    <string name="ai_status_local">Yerel model kullanılıyor (Qwen2.5 0.5B)</string>
-    <string name="ai_status_needs_download">Yerel modelin bir kez indirilmesi gerekiyor (%1$d MB)</string>
+    <string name="ai_title">Yapay zekâ ile çeviri (offline)</string>
+    <string name="ai_desc">Tablette çalışan Gemma 4 dil modeliyle çevirir: daha doğal Türkçe, kalan OCR hatalarını düzeltir, isimleri ve hitapları satırlar arasında tutarlı tutar. Hızlı çeviri önce görünür, yaklaşık bir saniye içinde yapay zekâ çevirisiyle değiştirilir. İnternet, token veya ücret yok.</string>
+    <string name="ai_status_loading">Model yükleniyor…</string>
+    <string name="ai_status_ready_gpu">Hazır · ekran kartında çalışıyor</string>
+    <string name="ai_status_ready_cpu">Hazır · işlemcide çalışıyor (daha yavaş)</string>
+    <string name="ai_status_needs_download">Modelin bir kez indirilmesi gerekiyor (%1$s)</string>
     <string name="ai_status_downloading">Model indiriliyor… %%%1$d</string>
     <string name="ai_status_downloading_indeterminate">Model indiriliyor…</string>
     <string name="ai_status_failed">Yapay zekâ kullanılamıyor: %1$s</string>
-    <string name="ai_dialog_title">Yapay zekâ modeli indirilsin mi?</string>
-    <string name="ai_dialog_body">Bu cihazda yerleşik bir yapay zekâ modeli yok; küçük bir offline model (Qwen2.5 0.5B, yaklaşık %1$d MB) gerekiyor. Bir kez indirilir (Wi-Fi önerilir), sonra tamamen offline çalışır.</string>
-    <string name="ai_refined">Yapay zekâ düzeltti</string>
+    <string name="ai_status_storage">Yetersiz depolama: %1$s gerekli, %2$s boş</string>
+    <string name="ai_dialog_title">Yapay zekâ çeviri modeli indirilsin mi?</string>
+    <string name="ai_dialog_body">Gemma 4 (yaklaşık %1$s) bir kez indirilir, sonra bu tablette tamamen offline çeviri yapar. Wi-Fi önerilir. İndirme bitene kadar normal offline çeviri çalışmaya devam eder.</string>
+    <string name="ai_size_gb">%1$.1f GB</string>
+    <string name="metrics_ai">OCR %1$d ms · Çeviri %2$d ms · Yapay zekâ %3$d ms</string>
 </resources>

@@ -52,7 +52,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ozkan.altyazi.R
-import com.ozkan.altyazi.ai.AiCorrection
+import com.ozkan.altyazi.ai.AiTranslator
 import com.ozkan.altyazi.translate.ModelState
 import com.ozkan.altyazi.translate.OfflineTranslator
 import com.ozkan.altyazi.ui.theme.AppColors
@@ -130,7 +130,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 onDismissRequest = viewModel::dismissAiDownload,
                 containerColor = AppColors.SurfaceHigh,
                 title = { Text(stringResource(R.string.ai_dialog_title)) },
-                text = { Text(stringResource(R.string.ai_dialog_body, AiCorrection.LOCAL_MODEL_SIZE_MB)) },
+                text = { Text(stringResource(R.string.ai_dialog_body, stringResource(R.string.ai_size_gb, AiTranslator.MODEL_SIZE_MB / 1024f))) },
                 confirmButton = { TextButton(onClick = viewModel::confirmAiDownload) { Text(stringResource(R.string.dialog_download_confirm)) } },
                 dismissButton = { TextButton(onClick = viewModel::dismissAiDownload) { Text(stringResource(R.string.dialog_download_later)) } },
             )
@@ -213,7 +213,8 @@ private fun CameraFooter(state: UiState) {
         Spacer(Modifier.weight(1f))
         state.metrics?.let {
             Text(
-                stringResource(R.string.metrics, it.ocrMs.toInt(), it.translateMs.toInt()),
+                if (it.aiMs != null) stringResource(R.string.metrics_ai, it.ocrMs.toInt(), it.translateMs.toInt(), it.aiMs.toInt())
+                else stringResource(R.string.metrics, it.ocrMs.toInt(), it.translateMs.toInt()),
                 style = MaterialTheme.typography.bodySmall,
                 color = AppColors.TextSecondary,
             )
