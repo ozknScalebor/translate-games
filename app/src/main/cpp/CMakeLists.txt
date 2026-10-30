@@ -64,6 +64,13 @@ include(MiniupnpcExternalProject)
 
 add_subdirectory("${CHIAKI_DIR}/lib" chiaki-lib)
 
+# Every wait on a socket goes through the stop pipe; use the poll()-based copy so descriptors above
+# FD_SETSIZE never abort the app.
+get_target_property(CHIAKI_LIB_SOURCES chiaki-lib SOURCES)
+list(REMOVE_ITEM CHIAKI_LIB_SOURCES "src/stoppipe.c")
+list(APPEND CHIAKI_LIB_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/chiaki-overrides/stoppipe.c")
+set_property(TARGET chiaki-lib PROPERTY SOURCES ${CHIAKI_LIB_SOURCES})
+
 if(NOT ANDROID AND ALTYAZI_SYSTEM_OPENSSL)
 	# Host-only configuration check: compile the internet hole-punching code along its Android
 	# path, which does not need libevent.
