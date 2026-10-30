@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.SwapHoriz
@@ -33,6 +34,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -61,6 +63,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.os.LocaleListCompat
 import com.ozkan.altyazi.R
+import com.ozkan.altyazi.ai.AiBackend
+import com.ozkan.altyazi.ai.AiState
 import com.ozkan.altyazi.data.AppSettings
 import com.ozkan.altyazi.data.Language
 import com.ozkan.altyazi.data.PanelBackground
@@ -80,6 +84,9 @@ private enum class AppLanguage(val tag: String, val label: Int) {
 fun SettingsSheet(
     settings: AppSettings,
     voiceMissing: Boolean,
+    aiState: AiState,
+    onAiDownload: () -> Unit,
+    onAiRetry: () -> Unit,
     onUpdate: ((AppSettings) -> AppSettings) -> Unit,
     onResetRoi: () -> Unit,
     onClearHistory: () -> Unit,
@@ -181,6 +188,11 @@ fun SettingsSheet(
                 Hint(stringResource(R.string.settings_voice_missing, stringResource(settings.targetLanguage.label)), AppColors.Danger)
             }
 
+            Spacer(Modifier.height(8.dp))
+            SwitchRow(stringResource(R.string.ai_title), settings.aiCorrection) { v -> onUpdate { it.copy(aiCorrection = v) } }
+            Hint(stringResource(R.string.ai_desc))
+            if (settings.aiCorrection) AiStatus(aiState, onAiDownload, onAiRetry)
+
             Label(stringResource(R.string.settings_app_language))
             AppLanguagePicker()
 
@@ -197,6 +209,51 @@ fun SettingsSheet(
                     Text(stringResource(R.string.settings_clear_history))
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun AiStatus(state: AiState, onDownload: () -> Unit, onRetry: () -> Unit) {
+    Column(Modifier.padding(top = 10.dp)) {
+        val text = when (state) {
+            AiState.Off -> null
+            AiState.Checking -> stringResource(R.string.ai_status_checking)
+            is AiState.Ready -> stringResource(
+                if (state.backend == AiBackend.GEMINI_NANO) R.string.ai_status_gemini else R.string.ai_status_local
+            )
+            is AiState.NeedsDownload -> stringResource(R.string.ai_status_needs_download, state.sizeMb)
+            is AiState.Downloading -> state.progress?.let { stringResource(R.string.ai_status_downloading, (it * 100).roundToInt()) }
+                ?: stringResource(R.string.ai_status_downloading_indeterminate)
+            is AiState.Failed -> stringResource(R.string.ai_status_failed, state.reason)
+        }
+        if (text != null) {
+            Text(
+                text,
+                style = MaterialTheme.typography.bodySmall,
+                color = when (state) {
+                    is AiState.Ready -> AppColors.Success
+                    is AiState.Failed -> AppColors.Danger
+                    else -> AppColors.TextSecondary
+                },
+            )
+        }
+        when (state) {
+            is AiState.Downloading -> {
+                Spacer(Modifier.height(8.dp))
+                val progress = state.progress
+                if (progress != null) LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+                else LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+            is AiState.NeedsDownload -> OutlinedButton(onClick = onDownload, modifier = Modifier.padding(top = 8.dp)) {
+                Icon(Icons.Rounded.Download, null, Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.action_download))
+            }
+            is AiState.Failed -> OutlinedButton(onClick = onRetry, modifier = Modifier.padding(top = 8.dp)) {
+                Text(stringResource(R.string.action_retry))
+            }
+            else -> Unit
         }
     }
 }

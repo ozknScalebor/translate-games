@@ -15,8 +15,8 @@ object SubtitleText {
     private val token = Regex("\\S+")
     private val sentenceStart = Regex("(^|[.!?…]\\s+|^[-–—]\\s*|\\s[-–—]\\s+)(\\p{Ll})")
     private val englishI = Regex("\\bi\\b")
-    /** Dialogue lines: "- Where are you? - Here." */
-    private val dialogueDash = Regex("(?:^|\\s)[-–—]\\s+(?=\\S)")
+    /** Dialogue lines: "- Where are you? - Here." and Netflix-style "-Where are you? -Here." */
+    private val dialogueDash = Regex("(?:^|\\s)[-–—]\\s*(?=\\p{L})")
 
     data class Line(val speaker: String?, val body: String) {
         fun format(translatedBody: String): String =

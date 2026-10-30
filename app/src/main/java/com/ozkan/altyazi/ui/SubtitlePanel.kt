@@ -146,7 +146,7 @@ private fun Transcript(
                     if (settings.showOriginal) {
                         Spacer(Modifier.height(if (isCurrent) 12.dp else 4.dp))
                         Text(
-                            line.original,
+                            if (line.refined) "✦ ${line.original}" else line.original,
                             style = TextStyle(
                                 fontSize = (settings.textSizeSp * if (isCurrent) 0.42f else 0.3f).coerceAtLeast(12f).sp,
                                 color = AppColors.TextSecondary,

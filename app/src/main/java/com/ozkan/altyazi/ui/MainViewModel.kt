@@ -12,13 +12,18 @@ import androidx.camera.core.ImageProxy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.ozkan.altyazi.ai.AiCorrection
+import com.ozkan.altyazi.ai.AiState
 import com.ozkan.altyazi.camera.CameraSource
 import com.ozkan.altyazi.camera.CameraSources
 import com.ozkan.altyazi.camera.awaitCameraProvider
 import com.ozkan.altyazi.camera.FrameCropper
+import com.ozkan.altyazi.core.CorrectionGuard
 import com.ozkan.altyazi.core.Read
+import com.ozkan.altyazi.core.SpellingRepair
 import com.ozkan.altyazi.core.SubtitleStabilizer
 import com.ozkan.altyazi.core.SubtitleText
+import com.ozkan.altyazi.core.WordDictionary
 import com.ozkan.altyazi.data.AppSettings
 import com.ozkan.altyazi.data.Language
 import com.ozkan.altyazi.data.Roi
@@ -29,6 +34,7 @@ import com.ozkan.altyazi.translate.ModelState
 import com.ozkan.altyazi.translate.OfflineTranslator
 import com.ozkan.altyazi.tts.Speaker
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,10 +42,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-data class SubtitleLine(val id: Long, val original: String, val translated: String)
+/** [refined] marks a line whose text was improved by the on-device AI after it was first shown. */
+data class SubtitleLine(val id: Long, val original: String, val translated: String, val refined: Boolean = false)
 
 data class Metrics(val ocrMs: Long, val translateMs: Long)
 
@@ -59,6 +68,8 @@ data class UiState(
     val paused: Boolean = false,
     val focusMode: Boolean = false,
     val voiceMissing: Boolean = false,
+    val aiState: AiState = AiState.Off,
+    val showAiDownloadPrompt: Boolean = false,
 )
 
 /**
@@ -74,6 +85,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val translator = OfflineTranslator(viewModelScope)
     private val speaker = Speaker(app)
     private val stabilizer = SubtitleStabilizer()
+    private val ai = AiCorrection(app, viewModelScope)
+
+    /** English dictionary for OCR repair; loaded once in the background (~0.5 MB asset). */
+    @Volatile private var dictionary: WordDictionary? = null
+    @Volatile private var repair: SpellingRepair? = null
+    private var aiJob: Job? = null
 
     val analysisExecutor: ExecutorService = Executors.newSingleThreadExecutor { r -> Thread(r, "subtitle-analysis") }
     val analyzer = ImageAnalysis.Analyzer { image -> image.use(::analyze) }
@@ -111,6 +128,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 if (first || previous.targetLanguage != s.targetLanguage) speaker.setLanguage(s.targetLanguage.key)
                 if (first || previous.speak != s.speak) speaker.setEnabled(s.speak)
+                if (first || previous.aiCorrection != s.aiCorrection || previous.sourceLanguage != s.sourceLanguage) {
+                    if (s.aiCorrection) ai.enable(s.sourceLanguage) else ai.disable()
+                }
                 if (previous.roi != s.roi) stabilizer.reset()
                 _ui.update { it.copy(settings = s, settingsLoaded = true) }
                 if (first || previous.cameraId != s.cameraId) chooseCamera()
@@ -122,6 +142,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 modelReady = state is ModelState.Ready
                 _ui.update { it.copy(modelState = state, showDownloadPrompt = state is ModelState.NeedsDownload) }
             }
+        }
+        viewModelScope.launch {
+            ai.state.collect { state ->
+                _ui.update {
+                    it.copy(
+                        aiState = state,
+                        showAiDownloadPrompt = state is AiState.NeedsDownload && settings.aiCorrection,
+                    )
+                }
+            }
+        }
+        viewModelScope.launch {
+            val loaded = withContext(Dispatchers.IO) {
+                runCatching { app.assets.open(DICTIONARY_ASSET).use(WordDictionary::load) }.getOrNull()
+            }
+            dictionary = loaded
+            repair = loaded?.let(::SpellingRepair)
         }
         viewModelScope.launch {
             speaker.voiceAvailable.collect { available ->
@@ -223,7 +260,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         return variants
             .map { bitmap ->
                 val raw = ocr.readBlocking(bitmap)
-                Read.of(SubtitleText.clean(raw.text, english), raw.confidence)
+                var text = SubtitleText.clean(raw.text, english)
+                val dict = if (english) dictionary else null
+                if (dict != null) text = repair?.repair(text) ?: text
+                Read.of(text, raw.confidence, dict)
             }
             .maxBy { it.score }
     }
@@ -251,6 +291,33 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     )
                 }
                 if (settings.speak) speaker.speak(translated)
+                refineWithAi(newLine)
+            }
+        }
+    }
+
+    /**
+     * Progressive refinement: the line is already on screen; if the on-device AI finds a genuine OCR
+     * fix, the line is re-translated and updated in place. A newer subtitle cancels this work so the
+     * tablet never queues up AI calls.
+     */
+    private fun refineWithAi(line: SubtitleLine) {
+        aiJob?.cancel()
+        if (ai.state.value !is AiState.Ready) return
+        aiJob = viewModelScope.launch {
+            val suggestion = withTimeoutOrNull(AI_TIMEOUT_MS) { ai.correct(line.original) } ?: return@launch
+            val corrected = CorrectionGuard.accept(line.original, suggestion) ?: return@launch
+            val translated = try {
+                translate(corrected)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                return@launch
+            }
+            _ui.update { state ->
+                state.copy(lines = state.lines.map {
+                    if (it.id == line.id) it.copy(original = corrected, translated = translated, refined = true) else it
+                })
             }
         }
     }
@@ -286,6 +353,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setFocusMode(enabled: Boolean) = _ui.update { it.copy(focusMode = enabled) }
 
+    fun confirmAiDownload() {
+        _ui.update { it.copy(showAiDownloadPrompt = false) }
+        ai.downloadLocalModel()
+    }
+
+    fun dismissAiDownload() {
+        _ui.update { it.copy(showAiDownloadPrompt = false) }
+        updateSettings { it.copy(aiCorrection = false) }
+    }
+
+    fun requestAiDownload() = _ui.update { it.copy(showAiDownloadPrompt = true) }
+
+    fun retryAi() {
+        ai.disable()
+        ai.enable(settings.sourceLanguage)
+    }
+
     fun clearHistory() = _ui.update { it.copy(lines = emptyList(), subtitleOnScreen = false) }
 
     fun confirmDownload() {
@@ -307,11 +391,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         ocr.close()
         translator.close()
         speaker.shutdown()
+        ai.close()
     }
 
     private companion object {
         /** At most ~8 OCR passes per second: catches subtitles instantly without heating the tablet. */
         const val MIN_FRAME_INTERVAL_MS = 120L
         const val HISTORY_LIMIT = 500
+        const val AI_TIMEOUT_MS = 4_000L
+        const val DICTIONARY_ASSET = "dict/en_words.txt.gz"
     }
 }

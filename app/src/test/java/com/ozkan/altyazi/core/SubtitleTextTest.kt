@@ -84,4 +84,18 @@ class SubtitleTextTest {
         val text = "Wait - who is that?"
         assertEquals(listOf(text), SubtitleText.splitDialogue(text))
     }
+
+    @Test
+    fun `netflix dialogue dashes without spaces are split`() {
+        assertEquals(
+            listOf("Do we get to sleep in the big bed?", "No, Donny. Outside!"),
+            SubtitleText.splitDialogue("-Do we get to sleep in the big bed? -No, Donny. Outside!"),
+        )
+    }
+
+    @Test
+    fun `hyphenated words are not dialogue`() {
+        val text = "A well-known, never-ending story."
+        assertEquals(listOf(text), SubtitleText.splitDialogue(text))
+    }
 }

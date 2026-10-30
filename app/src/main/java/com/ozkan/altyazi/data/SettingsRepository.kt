@@ -32,6 +32,7 @@ class SettingsRepository(context: Context) {
         val background = stringPreferencesKey("background")
         val showOriginal = booleanPreferencesKey("show_original")
         val speak = booleanPreferencesKey("speak")
+        val aiCorrection = booleanPreferencesKey("ai_correction")
         val sourceLanguage = stringPreferencesKey("source_language")
         val targetLanguage = stringPreferencesKey("target_language")
         val quality = stringPreferencesKey("quality")
@@ -73,6 +74,7 @@ class SettingsRepository(context: Context) {
             background = keyedValueOf(this[Keys.background], d.background),
             showOriginal = this[Keys.showOriginal] ?: d.showOriginal,
             speak = this[Keys.speak] ?: d.speak,
+            aiCorrection = this[Keys.aiCorrection] ?: d.aiCorrection,
             sourceLanguage = source,
             targetLanguage = target,
             quality = keyedValueOf(this[Keys.quality], d.quality),
@@ -89,6 +91,7 @@ class SettingsRepository(context: Context) {
         this[Keys.background] = s.background.key
         this[Keys.showOriginal] = s.showOriginal
         this[Keys.speak] = s.speak
+        this[Keys.aiCorrection] = s.aiCorrection
         this[Keys.sourceLanguage] = s.sourceLanguage.key
         this[Keys.targetLanguage] = s.targetLanguage.key
         this[Keys.quality] = s.quality.key

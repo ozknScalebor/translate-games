@@ -111,4 +111,17 @@
     <string name="camera_source">Kamera</string>
     <string name="history_jump">Son altyazıya git</string>
     <string name="settings_clear_history">Altyazı geçmişini temizle</string>
+
+    <string name="ai_title">Yapay zekâ ile düzelt (offline)</string>
+    <string name="ai_desc">OCR hatalarını cihaz üstündeki bir modelle düzeltir. Altyazı hemen görünür; yapay zekâ bir düzeltme bulursa aynı satır güncellenir.</string>
+    <string name="ai_status_checking">Cihaz kontrol ediliyor…</string>
+    <string name="ai_status_gemini">Bu cihazdaki Gemini Nano kullanılıyor</string>
+    <string name="ai_status_local">Yerel model kullanılıyor (Qwen2.5 0.5B)</string>
+    <string name="ai_status_needs_download">Yerel modelin bir kez indirilmesi gerekiyor (%1$d MB)</string>
+    <string name="ai_status_downloading">Model indiriliyor… %%%1$d</string>
+    <string name="ai_status_downloading_indeterminate">Model indiriliyor…</string>
+    <string name="ai_status_failed">Yapay zekâ kullanılamıyor: %1$s</string>
+    <string name="ai_dialog_title">Yapay zekâ modeli indirilsin mi?</string>
+    <string name="ai_dialog_body">Bu cihazda yerleşik bir yapay zekâ modeli yok; küçük bir offline model (Qwen2.5 0.5B, yaklaşık %1$d MB) gerekiyor. Bir kez indirilir (Wi-Fi önerilir), sonra tamamen offline çalışır.</string>
+    <string name="ai_refined">Yapay zekâ düzeltti</string>
 </resources>

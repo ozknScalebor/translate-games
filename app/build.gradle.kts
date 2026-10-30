@@ -90,6 +90,10 @@ dependencies {
     // On-device OCR (model bundled in the APK) and offline translation
     implementation("com.google.mlkit:text-recognition:16.0.1")
     implementation("com.google.mlkit:translate:17.0.3")
+
+    // Optional AI correction: Gemini Nano via ML Kit GenAI (system model) or a small local LLM
+    implementation("com.google.mlkit:genai-proofreading:1.0.0-beta1")
+    implementation("com.google.mediapipe:tasks-genai:0.10.27")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
 

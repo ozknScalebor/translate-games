@@ -28,4 +28,10 @@ class ReadScoreTest {
 
     @Test
     fun `blank text scores zero`() = assertEquals(0.0, ReadScore.of("  "), 0.0)
+
+    @Test
+    fun `dictionary prefers real words over a garbled read of similar shape`() {
+        val dictionary = WordDictionary(listOf("an", "owl", "pellet", "the", "of"))
+        assertTrue(ReadScore.of("An owl pellet.", 0.8f, dictionary) > ReadScore.of("An pm oadet.", 0.8f, dictionary))
+    }
 }

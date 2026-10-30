@@ -122,4 +122,18 @@
     <string name="camera_source">Camera</string>
     <string name="history_jump">Jump to latest subtitle</string>
     <string name="settings_clear_history">Clear subtitle history</string>
+
+    <!-- AI correction -->
+    <string name="ai_title">AI correction (offline)</string>
+    <string name="ai_desc">Fixes OCR mistakes with an on-device model. The subtitle appears immediately and is updated in place when the AI finds a fix.</string>
+    <string name="ai_status_checking">Checking this device…</string>
+    <string name="ai_status_gemini">Using Gemini Nano on this device</string>
+    <string name="ai_status_local">Using the local model (Qwen2.5 0.5B)</string>
+    <string name="ai_status_needs_download">The local model needs a one-time download (%1$d MB)</string>
+    <string name="ai_status_downloading">Downloading model… %1$d%%</string>
+    <string name="ai_status_downloading_indeterminate">Downloading model…</string>
+    <string name="ai_status_failed">AI unavailable: %1$s</string>
+    <string name="ai_dialog_title">Download AI model?</string>
+    <string name="ai_dialog_body">This device has no built-in AI model, so a small offline model (Qwen2.5 0.5B, about %1$d MB) is needed. It is downloaded once, Wi-Fi recommended, and then runs fully offline.</string>
+    <string name="ai_refined">Corrected by AI</string>
 </resources>

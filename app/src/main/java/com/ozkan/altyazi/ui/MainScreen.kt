@@ -52,6 +52,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ozkan.altyazi.R
+import com.ozkan.altyazi.ai.AiCorrection
 import com.ozkan.altyazi.translate.ModelState
 import com.ozkan.altyazi.translate.OfflineTranslator
 import com.ozkan.altyazi.ui.theme.AppColors
@@ -114,10 +115,24 @@ fun MainScreen(viewModel: MainViewModel) {
             SettingsSheet(
                 settings = state.settings,
                 voiceMissing = state.voiceMissing,
+                aiState = state.aiState,
+                onAiDownload = viewModel::requestAiDownload,
+                onAiRetry = viewModel::retryAi,
                 onUpdate = viewModel::updateSettings,
                 onResetRoi = viewModel::resetRoi,
                 onClearHistory = viewModel::clearHistory,
                 onDismiss = { settingsOpen = false },
+            )
+        }
+
+        if (state.showAiDownloadPrompt) {
+            AlertDialog(
+                onDismissRequest = viewModel::dismissAiDownload,
+                containerColor = AppColors.SurfaceHigh,
+                title = { Text(stringResource(R.string.ai_dialog_title)) },
+                text = { Text(stringResource(R.string.ai_dialog_body, AiCorrection.LOCAL_MODEL_SIZE_MB)) },
+                confirmButton = { TextButton(onClick = viewModel::confirmAiDownload) { Text(stringResource(R.string.dialog_download_confirm)) } },
+                dismissButton = { TextButton(onClick = viewModel::dismissAiDownload) { Text(stringResource(R.string.dialog_download_later)) } },
             )
         }
 

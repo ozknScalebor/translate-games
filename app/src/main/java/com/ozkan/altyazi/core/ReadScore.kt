@@ -6,7 +6,8 @@ import kotlin.math.max
 data class Read(val text: String, val score: Double) {
     companion object {
         val EMPTY = Read("", 0.0)
-        fun of(text: String, confidence: Float? = null) = Read(text, ReadScore.of(text, confidence))
+        fun of(text: String, confidence: Float? = null, dictionary: WordDictionary? = null) =
+            Read(text, ReadScore.of(text, confidence, dictionary))
     }
 }
 
@@ -16,12 +17,26 @@ data class Read(val text: String, val score: Double) {
  * Camera reads of a TV are noisy: busy backgrounds produce stray symbols and words with digits mixed
  * into them. A read made of clean alphabetic words beats one full of fragments, which lets the
  * pipeline pick the better of several passes/frames without any language model.
+ *
+ * With a [WordDictionary] (English), half of the score is the share of tokens that are real words:
+ * on real camera footage this is the signal that reliably tells a clean read from a garbled one.
  */
 object ReadScore {
 
     private const val ALLOWED_PUNCTUATION = ".,!?'\"-–—:;…()¿¡"
 
-    fun of(text: String, confidence: Float? = null): Double {
+    private val wordToken = Regex("[A-Za-z]+(?:'[a-z]+)?")
+
+    fun of(text: String, confidence: Float? = null, dictionary: WordDictionary? = null): Double {
+        val shape = shapeScore(text, confidence)
+        if (dictionary == null || shape == 0.0) return shape
+        val tokens = wordToken.findAll(text).map { it.value.substringBefore('\'') }.toList()
+        if (tokens.isEmpty()) return shape
+        val known = tokens.count { dictionary.contains(it) }.toDouble() / tokens.size
+        return 0.5 * known + 0.5 * shape
+    }
+
+    private fun shapeScore(text: String, confidence: Float?): Double {
         if (text.isBlank()) return 0.0
         var good = 0
         var bad = 0
