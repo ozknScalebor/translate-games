@@ -212,4 +212,8 @@
     <string name="psn_blank_body">Girişi tarayıcıda yapın. En sonda boş bir \"redirect\" sayfası açılır: adres çubuğundaki adresin tamamını kopyalayıp buraya yapıştırın.</string>
     <string name="psn_open_browser">Tarayıcıda aç</string>
     <string name="psn_paste_url">Redirect adresini yapıştırın</string>
+    <string name="crash_title">Uygulama beklenmedik şekilde kapandı</string>
+    <string name="crash_body">Android\'in kaydettiği ayrıntılar aşağıda. Kopyalayıp geliştiriciye gönderin, sorun giderilsin.</string>
+    <string name="crash_copy">Kopyala</string>
+    <string name="crash_copied">Kopyalandı</string>
 </resources>

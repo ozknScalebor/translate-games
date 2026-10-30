@@ -9,6 +9,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.ozkan.altyazi.diagnostics.CrashReporter
 import com.ozkan.altyazi.ui.MainScreen
 import com.ozkan.altyazi.ui.MainViewModel
 import com.ozkan.altyazi.ui.theme.AltyaziTheme
@@ -20,8 +21,10 @@ import com.ozkan.altyazi.ui.theme.AltyaziTheme
 class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        CrashReporter.install(applicationContext)
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        val crashReport = CrashReporter.takeReport(this)
         // A gaming companion must never dim or lock mid-session.
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         hideSystemBars()
@@ -29,7 +32,7 @@ class MainActivity : AppCompatActivity() {
         setContent {
             AltyaziTheme {
                 val viewModel: MainViewModel = viewModel()
-                MainScreen(viewModel)
+                MainScreen(viewModel, crashReport)
             }
         }
     }

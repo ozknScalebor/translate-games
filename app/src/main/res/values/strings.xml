@@ -224,4 +224,8 @@
     <string name="psn_blank_body">Sign in in the browser instead. It ends on a blank \"redirect\" page: copy its full address from the address bar and paste it here.</string>
     <string name="psn_open_browser">Open in browser</string>
     <string name="psn_paste_url">Paste the redirect address</string>
+    <string name="crash_title">The app closed unexpectedly</string>
+    <string name="crash_body">Here is what Android recorded. Copy it and send it to the developer to get it fixed.</string>
+    <string name="crash_copy">Copy</string>
+    <string name="crash_copied">Copied</string>
 </resources>

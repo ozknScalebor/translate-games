@@ -16,6 +16,12 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -68,7 +74,7 @@ import com.ozkan.altyazi.ui.remote.RemotePlayScreen
 import com.ozkan.altyazi.ui.theme.AppColors
 
 @Composable
-fun MainScreen(viewModel: MainViewModel) {
+fun MainScreen(viewModel: MainViewModel, crashReport: String? = null) {
     val state by viewModel.ui.collectAsStateWithLifecycle()
     val remote by viewModel.remote.state.collectAsStateWithLifecycle()
     val remoteActions = remember(viewModel) { remoteActionsFor(viewModel) }
@@ -103,6 +109,9 @@ fun MainScreen(viewModel: MainViewModel) {
                 dismissButton = { TextButton(onClick = viewModel::dismissAiDownload) { Text(stringResource(R.string.dialog_download_later)) } },
             )
         }
+
+        var showCrash by rememberSaveable { mutableStateOf(crashReport != null) }
+        if (showCrash && crashReport != null) CrashReportDialog(crashReport, onDismiss = { showCrash = false })
 
         val needs = state.modelState as? ModelState.NeedsDownload
         if (state.showDownloadPrompt && needs != null) {
@@ -403,5 +412,37 @@ private fun DownloadDialog(source: String, target: String, sizeMb: Int, onConfir
         text = { Text(stringResource(R.string.dialog_download_body, source, target, sizeMb)) },
         confirmButton = { TextButton(onClick = onConfirm) { Text(stringResource(R.string.dialog_download_confirm)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.dialog_download_later)) } },
+    )
+}
+
+/** Shown once after the app closed unexpectedly, so the details can be copied and reported. */
+@Composable
+private fun CrashReportDialog(report: String, onDismiss: () -> Unit) {
+    val clipboard = LocalClipboardManager.current
+    var copied by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = AppColors.SurfaceHigh,
+        title = { Text(stringResource(R.string.crash_title)) },
+        text = {
+            Column {
+                Text(stringResource(R.string.crash_body), color = AppColors.TextSecondary)
+                Spacer(Modifier.height(12.dp))
+                Surface(shape = RoundedCornerShape(12.dp), color = AppColors.Background) {
+                    Text(
+                        report,
+                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                        modifier = Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()).padding(12.dp),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                clipboard.setText(AnnotatedString(report))
+                copied = true
+            }) { Text(stringResource(if (copied) R.string.crash_copied else R.string.crash_copy)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) } },
     )
 }
