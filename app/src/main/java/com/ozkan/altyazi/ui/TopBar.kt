@@ -2,8 +2,6 @@ package com.ozkan.altyazi.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -12,11 +10,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CameraFront
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.VideocamOff
 import androidx.compose.material.icons.rounded.CameraRear
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Fullscreen
@@ -27,15 +26,24 @@ import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Usb
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,7 +51,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ozkan.altyazi.R
 import com.ozkan.altyazi.camera.CameraSource
@@ -73,28 +80,8 @@ fun TopBar(
         Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge, maxLines = 1)
         Spacer(Modifier.width(24.dp))
 
-        // Camera sources
-        Row(
-            modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            cameras.forEach { camera ->
-                FilterChip(
-                    selected = camera.id == activeCameraId,
-                    onClick = { onSelectCamera(camera.id) },
-                    label = { Text(camera.label(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                    leadingIcon = { Icon(camera.kind.icon(), contentDescription = null, modifier = Modifier.size(18.dp)) },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = AppColors.Primary.copy(alpha = 0.22f),
-                        selectedLabelColor = AppColors.TextPrimary,
-                        selectedLeadingIconColor = AppColors.Primary,
-                    ),
-                )
-            }
-        }
-
+        CameraPicker(cameras, activeCameraId, onSelectCamera)
+        Spacer(Modifier.weight(1f))
         Spacer(Modifier.width(12.dp))
         ModelStatusPill(modelState, onDownload, onRetry)
         Spacer(Modifier.width(12.dp))
@@ -112,6 +99,56 @@ fun TopBar(
         Spacer(Modifier.width(8.dp))
         FilledTonalIconButton(onClick = onOpenSettings) {
             Icon(Icons.Rounded.Settings, stringResource(R.string.action_settings))
+        }
+    }
+}
+
+/** Camera source dropdown; cameras plugged in at runtime show up here automatically. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CameraPicker(cameras: List<CameraSource>, activeCameraId: String?, onSelect: (String) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    val active = cameras.firstOrNull { it.id == activeCameraId }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it && cameras.isNotEmpty() },
+    ) {
+        OutlinedTextField(
+            value = active?.label() ?: stringResource(R.string.camera_none),
+            onValueChange = {},
+            readOnly = true,
+            singleLine = true,
+            label = { Text(stringResource(R.string.camera_source)) },
+            leadingIcon = { Icon(active?.kind?.icon() ?: Icons.Rounded.VideocamOff, contentDescription = null) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            shape = RoundedCornerShape(14.dp),
+            textStyle = MaterialTheme.typography.bodyMedium,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = AppColors.Primary,
+                unfocusedBorderColor = AppColors.Outline,
+            ),
+            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).width(280.dp),
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            containerColor = AppColors.SurfaceHigh,
+        ) {
+            cameras.forEach { camera ->
+                DropdownMenuItem(
+                    text = { Text(camera.label()) },
+                    leadingIcon = { Icon(camera.kind.icon(), contentDescription = null) },
+                    trailingIcon = {
+                        if (camera.id == activeCameraId) Icon(Icons.Rounded.Check, stringResource(R.string.selected), tint = AppColors.Primary)
+                    },
+                    onClick = {
+                        onSelect(camera.id)
+                        expanded = false
+                    },
+                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
+                )
+            }
         }
     }
 }

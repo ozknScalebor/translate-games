@@ -65,7 +65,7 @@
     <string name="settings_color">Text color</string>
     <string name="settings_background">Subtitle background</string>
     <string name="settings_behavior">Behavior</string>
-    <string name="settings_response">Response speed</string>
+    <string name="settings_response">Speed vs quality</string>
     <string name="settings_show_original">Show original text</string>
     <string name="settings_speak">Read translations aloud</string>
     <string name="settings_voice_missing">No %1$s voice is installed. Install one under Settings › General management › Text-to-speech.</string>
@@ -90,14 +90,6 @@
     <string name="bg_soft">Translucent</string>
     <string name="bg_solid">Dark</string>
 
-    <!-- Stability -->
-    <string name="stability_fast">Fast</string>
-    <string name="stability_balanced">Balanced</string>
-    <string name="stability_stable">Stable</string>
-    <string name="stability_fast_desc">Lowest delay; an occasional partial read</string>
-    <string name="stability_balanced_desc">Recommended</string>
-    <string name="stability_stable_desc">Cleanest result with a shaky or blurry image</string>
-
     <!-- Languages -->
     <string name="lang_en">English</string>
     <string name="lang_tr">Turkish</string>
@@ -113,4 +105,21 @@
     <string name="lang_ja">Japanese</string>
     <string name="lang_ko">Korean</string>
     <string name="lang_zh">Chinese</string>
+
+    <!-- Speed / quality -->
+    <string name="quality_instant">Instant</string>
+    <string name="quality_fast">Fast</string>
+    <string name="quality_balanced">Balanced</string>
+    <string name="quality_best">Best</string>
+    <string name="quality_max">Max</string>
+    <string name="quality_instant_desc">single pass, lowest delay</string>
+    <string name="quality_fast_desc">two passes, confirmed over 2 frames</string>
+    <string name="quality_balanced_desc">two passes, voting over 3 frames</string>
+    <string name="quality_best_desc">recommended: two passes, voting over 4 frames</string>
+    <string name="quality_max_desc">for busy or shaky images: voting over 6 frames</string>
+    <string name="quality_hint">About %1$d ms delay · %2$s</string>
+
+    <string name="camera_source">Camera</string>
+    <string name="history_jump">Jump to latest subtitle</string>
+    <string name="settings_clear_history">Clear subtitle history</string>
 </resources>

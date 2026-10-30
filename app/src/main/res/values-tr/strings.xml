@@ -58,7 +58,7 @@
     <string name="settings_color">Yazı rengi</string>
     <string name="settings_background">Altyazı arka planı</string>
     <string name="settings_behavior">Davranış</string>
-    <string name="settings_response">Tepki hızı</string>
+    <string name="settings_response">Hız ve kalite</string>
     <string name="settings_show_original">Orijinal metni göster</string>
     <string name="settings_speak">Çeviriyi sesli oku</string>
     <string name="settings_voice_missing">%1$s ses yüklü değil. Ayarlar › Genel yönetim › Metin okuma çıkışı bölümünden yükleyin.</string>
@@ -81,13 +81,6 @@
     <string name="bg_soft">Yarı saydam</string>
     <string name="bg_solid">Koyu</string>
 
-    <string name="stability_fast">Hızlı</string>
-    <string name="stability_balanced">Dengeli</string>
-    <string name="stability_stable">Kararlı</string>
-    <string name="stability_fast_desc">En düşük gecikme; ara sıra yarım okuma</string>
-    <string name="stability_balanced_desc">Önerilen ayar</string>
-    <string name="stability_stable_desc">Titrek veya bulanık görüntüde en temiz sonuç</string>
-
     <string name="lang_en">İngilizce</string>
     <string name="lang_tr">Türkçe</string>
     <string name="lang_de">Almanca</string>
@@ -102,4 +95,20 @@
     <string name="lang_ja">Japonca</string>
     <string name="lang_ko">Korece</string>
     <string name="lang_zh">Çince</string>
+
+    <string name="quality_instant">Anlık</string>
+    <string name="quality_fast">Hızlı</string>
+    <string name="quality_balanced">Dengeli</string>
+    <string name="quality_best">En iyi</string>
+    <string name="quality_max">Maksimum</string>
+    <string name="quality_instant_desc">tek geçiş, en düşük gecikme</string>
+    <string name="quality_fast_desc">çift geçiş, 2 karede doğrulama</string>
+    <string name="quality_balanced_desc">çift geçiş, 3 karede oylama</string>
+    <string name="quality_best_desc">önerilen: çift geçiş, 4 karede oylama</string>
+    <string name="quality_max_desc">karmaşık veya titrek görüntü için: 6 karede oylama</string>
+    <string name="quality_hint">Yaklaşık %1$d ms gecikme · %2$s</string>
+
+    <string name="camera_source">Kamera</string>
+    <string name="history_jump">Son altyazıya git</string>
+    <string name="settings_clear_history">Altyazı geçmişini temizle</string>
 </resources>

@@ -16,11 +16,14 @@ import com.ozkan.altyazi.camera.CameraSource
 import com.ozkan.altyazi.camera.CameraSources
 import com.ozkan.altyazi.camera.awaitCameraProvider
 import com.ozkan.altyazi.camera.FrameCropper
+import com.ozkan.altyazi.core.Read
 import com.ozkan.altyazi.core.SubtitleStabilizer
 import com.ozkan.altyazi.core.SubtitleText
 import com.ozkan.altyazi.data.AppSettings
+import com.ozkan.altyazi.data.Language
 import com.ozkan.altyazi.data.Roi
 import com.ozkan.altyazi.data.SettingsRepository
+import com.ozkan.altyazi.ocr.SubtitleEnhancer
 import com.ozkan.altyazi.ocr.SubtitleOcr
 import com.ozkan.altyazi.translate.ModelState
 import com.ozkan.altyazi.translate.OfflineTranslator
@@ -49,8 +52,8 @@ data class UiState(
     val cameraError: String? = null,
     val modelState: ModelState = ModelState.Checking,
     val showDownloadPrompt: Boolean = false,
-    val current: SubtitleLine? = null,
-    val history: List<SubtitleLine> = emptyList(),
+    /** Translated subtitles, newest first. */
+    val lines: List<SubtitleLine> = emptyList(),
     val subtitleOnScreen: Boolean = false,
     val metrics: Metrics? = null,
     val paused: Boolean = false,
@@ -194,42 +197,55 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
         val s = settings
         val started = SystemClock.elapsedRealtime()
-        val text = try {
-            ocr.readBlocking(FrameCropper.crop(image, s.roi))
+        val read = try {
+            readSubtitle(image, s)
         } catch (e: Exception) {
-            ""
+            Read.EMPTY
         }
         val ocrMs = SystemClock.elapsedRealtime() - started
 
-        stabilizer.requiredHits = s.stability.requiredHits
-        when (val event = stabilizer.accept(if (SubtitleText.isMeaningful(text)) text else "")) {
+        stabilizer.requiredHits = s.quality.requiredReads
+        when (val event = stabilizer.accept(if (SubtitleText.isMeaningful(read.text)) read else Read.EMPTY)) {
             is SubtitleStabilizer.Event.Commit -> onCommit(event.text, ocrMs)
             SubtitleStabilizer.Event.Cleared -> _ui.update { it.copy(subtitleOnScreen = false) }
             null -> Unit
         }
     }
 
+    /**
+     * OCRs the subtitle crop and, in dual-pass mode, a high-contrast copy that isolates white/yellow
+     * subtitle ink from the scene behind it. The better-scoring read wins.
+     */
+    private fun readSubtitle(image: ImageProxy, s: AppSettings): Read {
+        val english = s.sourceLanguage == Language.ENGLISH
+        val crop = FrameCropper.crop(image, s.roi)
+        val variants = if (s.quality.dualPass) listOf(crop, SubtitleEnhancer.isolateBrightText(crop)) else listOf(crop)
+        return variants
+            .map { bitmap ->
+                val raw = ocr.readBlocking(bitmap)
+                Read.of(SubtitleText.clean(raw.text, english), raw.confidence)
+            }
+            .maxBy { it.score }
+    }
+
     private fun onCommit(text: String, ocrMs: Long) {
         viewModelScope.launch {
             translateJob?.cancel() // a newer subtitle makes the pending translation obsolete
             translateJob = launch {
-                val line = SubtitleText.splitSpeaker(text)
                 val started = SystemClock.elapsedRealtime()
-                val translatedBody = try {
-                    translator.translate(line.body)
+                val translated = try {
+                    translate(text)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
                     return@launch
                 }
-                val translated = line.format(translatedBody)
                 val translateMs = SystemClock.elapsedRealtime() - started
 
                 val newLine = SubtitleLine(nextLineId++, text, translated)
                 _ui.update { state ->
                     state.copy(
-                        current = newLine,
-                        history = (listOfNotNull(state.current) + state.history).take(HISTORY_SIZE),
+                        lines = (listOf(newLine) + state.lines).take(HISTORY_LIMIT),
                         subtitleOnScreen = true,
                         metrics = Metrics(ocrMs, translateMs),
                     )
@@ -237,6 +253,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 if (settings.speak) speaker.speak(translated)
             }
         }
+    }
+
+    /**
+     * Prepares the text for the translation model: the speaker name is kept as-is, ALL-CAPS text is
+     * converted to sentence case, and "- line - line" dialogue is translated line by line.
+     */
+    private suspend fun translate(text: String): String {
+        val english = settings.sourceLanguage == Language.ENGLISH
+        val line = SubtitleText.splitSpeaker(text)
+        val parts = SubtitleText.splitDialogue(SubtitleText.toSentenceCase(line.body, english))
+        val translated = parts.map { translator.translate(it) }
+        val body = if (translated.size > 1) translated.joinToString("\n") { "– $it" } else translated.first()
+        return line.format(body)
     }
 
     // ---------- User actions ----------
@@ -256,6 +285,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setFocusMode(enabled: Boolean) = _ui.update { it.copy(focusMode = enabled) }
+
+    fun clearHistory() = _ui.update { it.copy(lines = emptyList(), subtitleOnScreen = false) }
 
     fun confirmDownload() {
         _ui.update { it.copy(showDownloadPrompt = false) }
@@ -281,6 +312,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private companion object {
         /** At most ~8 OCR passes per second: catches subtitles instantly without heating the tablet. */
         const val MIN_FRAME_INTERVAL_MS = 120L
-        const val HISTORY_SIZE = 2
+        const val HISTORY_LIMIT = 500
     }
 }

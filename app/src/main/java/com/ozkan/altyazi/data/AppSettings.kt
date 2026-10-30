@@ -50,15 +50,24 @@ enum class PanelBackground(override val key: String, @StringRes val label: Int, 
     SOLID("solid", R.string.bg_solid, 0.92f),
 }
 
-enum class Stability(
+/**
+ * Speed/quality trade-off. Each step reads the subtitle over more frames and votes on the result;
+ * every step except [INSTANT] also runs a second, high-contrast OCR pass per frame.
+ * [approxDelayMs] is a typical end-to-end delay on a current tablet.
+ */
+enum class Quality(
     override val key: String,
     @StringRes val label: Int,
     @StringRes val description: Int,
-    val requiredHits: Int,
+    val requiredReads: Int,
+    val dualPass: Boolean,
+    val approxDelayMs: Int,
 ) : Keyed {
-    FAST("fast", R.string.stability_fast, R.string.stability_fast_desc, 1),
-    BALANCED("balanced", R.string.stability_balanced, R.string.stability_balanced_desc, 2),
-    STABLE("stable", R.string.stability_stable, R.string.stability_stable_desc, 3),
+    INSTANT("instant", R.string.quality_instant, R.string.quality_instant_desc, 1, false, 150),
+    FAST("fast", R.string.quality_fast, R.string.quality_fast_desc, 2, true, 300),
+    BALANCED("balanced", R.string.quality_balanced, R.string.quality_balanced_desc, 3, true, 420),
+    BEST("best", R.string.quality_best, R.string.quality_best_desc, 4, true, 550),
+    MAX("max", R.string.quality_max, R.string.quality_max_desc, 6, true, 800),
 }
 
 /** Normalized (0..1) subtitle region relative to the camera frame. */
@@ -82,7 +91,7 @@ data class AppSettings(
     val speak: Boolean = false,
     val sourceLanguage: Language = Language.ENGLISH,
     val targetLanguage: Language = Language.TURKISH,
-    val stability: Stability = Stability.BALANCED,
+    val quality: Quality = Quality.BEST,
     val roi: Roi = Roi.DEFAULT,
     val cameraId: String? = null,
 ) {

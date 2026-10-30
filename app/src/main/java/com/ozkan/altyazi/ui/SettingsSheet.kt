@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -63,7 +64,7 @@ import com.ozkan.altyazi.R
 import com.ozkan.altyazi.data.AppSettings
 import com.ozkan.altyazi.data.Language
 import com.ozkan.altyazi.data.PanelBackground
-import com.ozkan.altyazi.data.Stability
+import com.ozkan.altyazi.data.Quality
 import com.ozkan.altyazi.data.SubtitleFont
 import com.ozkan.altyazi.ui.theme.AppColors
 import com.ozkan.altyazi.ui.theme.toFontFamily
@@ -81,6 +82,7 @@ fun SettingsSheet(
     voiceMissing: Boolean,
     onUpdate: ((AppSettings) -> AppSettings) -> Unit,
     onResetRoi: () -> Unit,
+    onClearHistory: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -169,8 +171,8 @@ fun SettingsSheet(
             // ---------- Behavior ----------
             Group(stringResource(R.string.settings_behavior))
             Label(stringResource(R.string.settings_response))
-            Segmented(Stability.entries, settings.stability, { stringResource(it.label) }) { v -> onUpdate { it.copy(stability = v) } }
-            Hint(stringResource(settings.stability.description))
+            Segmented(Quality.entries, settings.quality, { stringResource(it.label) }) { v -> onUpdate { it.copy(quality = v) } }
+            Hint(stringResource(R.string.quality_hint, settings.quality.approxDelayMs, stringResource(settings.quality.description)))
 
             Spacer(Modifier.height(12.dp))
             SwitchRow(stringResource(R.string.settings_show_original), settings.showOriginal) { v -> onUpdate { it.copy(showOriginal = v) } }
@@ -183,10 +185,17 @@ fun SettingsSheet(
             AppLanguagePicker()
 
             Spacer(Modifier.height(20.dp))
-            OutlinedButton(onClick = onResetRoi) {
-                Icon(Icons.Rounded.RestartAlt, null, Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.settings_reset_roi))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(onClick = onResetRoi) {
+                    Icon(Icons.Rounded.RestartAlt, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.settings_reset_roi))
+                }
+                OutlinedButton(onClick = onClearHistory) {
+                    Icon(Icons.Rounded.DeleteSweep, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.settings_clear_history))
+                }
             }
         }
     }

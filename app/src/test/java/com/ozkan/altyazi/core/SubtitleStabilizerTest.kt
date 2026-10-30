@@ -59,6 +59,21 @@ class SubtitleStabilizerTest {
     }
 
     @Test
+    fun `voting picks the clean read over a garbled frame`() {
+        val s = SubtitleStabilizer(requiredHits = 3)
+        assertNull(s.accept("We have to 1eave n0w!"))
+        assertNull(s.accept("We have to leave now!"))
+        assertEquals(Event.Commit("We have to leave now!"), s.accept("We have to leave now!"))
+    }
+
+    @Test
+    fun `voting uses read scores`() {
+        val s = SubtitleStabilizer(requiredHits = 2)
+        assertNull(s.accept(Read("Keep m0ving forward", 0.2)))
+        assertEquals(Event.Commit("Keep moving forward"), s.accept(Read("Keep moving forward", 0.9)))
+    }
+
+    @Test
     fun `required hits never drops below one`() {
         val s = SubtitleStabilizer(requiredHits = 0)
         assertEquals(1, s.requiredHits)

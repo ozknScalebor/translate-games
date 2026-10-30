@@ -34,7 +34,7 @@ class SettingsRepository(context: Context) {
         val speak = booleanPreferencesKey("speak")
         val sourceLanguage = stringPreferencesKey("source_language")
         val targetLanguage = stringPreferencesKey("target_language")
-        val stability = stringPreferencesKey("stability")
+        val quality = stringPreferencesKey("quality")
         val roiLeft = floatPreferencesKey("roi_left")
         val roiTop = floatPreferencesKey("roi_top")
         val roiRight = floatPreferencesKey("roi_right")
@@ -75,7 +75,7 @@ class SettingsRepository(context: Context) {
             speak = this[Keys.speak] ?: d.speak,
             sourceLanguage = source,
             targetLanguage = target,
-            stability = keyedValueOf(this[Keys.stability], d.stability),
+            quality = keyedValueOf(this[Keys.quality], d.quality),
             roi = roi,
             cameraId = this[Keys.cameraId],
         )
@@ -91,7 +91,7 @@ class SettingsRepository(context: Context) {
         this[Keys.speak] = s.speak
         this[Keys.sourceLanguage] = s.sourceLanguage.key
         this[Keys.targetLanguage] = s.targetLanguage.key
-        this[Keys.stability] = s.stability.key
+        this[Keys.quality] = s.quality.key
         this[Keys.roiLeft] = s.roi.left
         this[Keys.roiTop] = s.roi.top
         this[Keys.roiRight] = s.roi.right

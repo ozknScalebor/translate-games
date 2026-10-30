@@ -1,14 +1,11 @@
 package com.ozkan.altyazi.ui
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -25,8 +22,6 @@ import androidx.compose.material.icons.rounded.FullscreenExit
 import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.VideocamOff
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
@@ -36,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -44,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -59,9 +56,21 @@ fun MainScreen(viewModel: MainViewModel) {
     val state by viewModel.ui.collectAsStateWithLifecycle()
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
 
+    // The camera card is movable content: switching between the split and fullscreen layouts moves
+    // the live preview instead of tearing it down, so recognition never stops.
+    val cameraCard = remember(viewModel) {
+        movableContentOf { s: UiState, compact: Boolean, modifier: Modifier ->
+            CameraCard(s, viewModel, compact, modifier)
+        }
+    }
+
     Box(Modifier.fillMaxSize().background(AppColors.Background)) {
         if (state.focusMode) {
-            FocusLayout(state, onExit = { viewModel.setFocusMode(false) })
+            FocusLayout(
+                state = state,
+                camera = { modifier -> cameraCard(state, true, modifier) },
+                onExit = { viewModel.setFocusMode(false) },
+            )
         } else {
             Column(Modifier.fillMaxSize()) {
                 TopBar(
@@ -80,10 +89,12 @@ fun MainScreen(viewModel: MainViewModel) {
                     modifier = Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
                     horizontalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
-                    CameraColumn(state, viewModel, Modifier.weight(0.46f).fillMaxHeight())
+                    Column(Modifier.weight(0.46f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        cameraCard(state, false, Modifier.fillMaxWidth())
+                        CameraFooter(state)
+                    }
                     SubtitlePanel(
-                        current = state.current,
-                        history = state.history,
+                        lines = state.lines,
                         settings = state.settings,
                         onScreen = state.subtitleOnScreen,
                         placeholder = placeholderFor(state),
@@ -99,6 +110,7 @@ fun MainScreen(viewModel: MainViewModel) {
                 voiceMissing = state.voiceMissing,
                 onUpdate = viewModel::updateSettings,
                 onResetRoi = viewModel::resetRoi,
+                onClearHistory = viewModel::clearHistory,
                 onDismiss = { settingsOpen = false },
             )
         }
@@ -116,64 +128,67 @@ fun MainScreen(viewModel: MainViewModel) {
     }
 }
 
+/** Live camera preview with the subtitle-region selector on top. */
 @Composable
-private fun CameraColumn(state: UiState, viewModel: MainViewModel, modifier: Modifier) {
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Card(
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = AppColors.Surface),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(24.dp)).background(Color.Black)) {
-                val cameraId = state.activeCameraId
-                val selector = viewModel.selectorFor(cameraId)
-                if (cameraId != null && selector != null) {
-                    CameraViewport(
-                        cameraId = cameraId,
-                        selector = selector,
-                        analyzer = viewModel.analyzer,
-                        executor = viewModel.analysisExecutor,
-                        onError = viewModel::onCameraError,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                    RoiSelector(
-                        roi = state.settings.roi,
-                        onRoiChanged = viewModel::updateRoi,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else if (state.camerasLoaded) {
-                    CenterMessage(Icons.Rounded.VideocamOff, stringResource(R.string.camera_none))
-                }
-
-                if (state.paused) {
-                    Surface(
-                        color = AppColors.Accent,
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.align(Alignment.TopStart).padding(12.dp),
-                    ) {
-                        Text(
-                            stringResource(R.string.paused_badge),
-                            color = Color.Black,
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.labelLarge,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                        )
-                    }
-                }
-            }
+private fun CameraCard(state: UiState, viewModel: MainViewModel, compact: Boolean, modifier: Modifier) {
+    val shape = RoundedCornerShape(if (compact) 16.dp else 24.dp)
+    Box(
+        modifier
+            .aspectRatio(16f / 9f)
+            .clip(shape)
+            .background(Color.Black)
+            .border(1.dp, AppColors.Outline, shape)
+    ) {
+        val cameraId = state.activeCameraId
+        val selector = viewModel.selectorFor(cameraId)
+        if (cameraId != null && selector != null) {
+            CameraViewport(
+                cameraId = cameraId,
+                selector = selector,
+                analyzer = viewModel.analyzer,
+                executor = viewModel.analysisExecutor,
+                onError = viewModel::onCameraError,
+                modifier = Modifier.fillMaxSize(),
+            )
+            RoiSelector(
+                roi = state.settings.roi,
+                onRoiChanged = viewModel::updateRoi,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else if (state.camerasLoaded) {
+            CenterMessage(Icons.Rounded.VideocamOff, stringResource(R.string.camera_none))
         }
 
+        if (state.paused) {
+            Surface(
+                color = AppColors.Accent,
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.align(Alignment.TopStart).padding(if (compact) 6.dp else 12.dp),
+            ) {
+                Text(
+                    stringResource(R.string.paused_badge),
+                    color = Color.Black,
+                    fontWeight = FontWeight.Bold,
+                    style = if (compact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CameraFooter(state: UiState) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxHeight()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Rounded.TouchApp, null, tint = AppColors.Accent, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text(stringResource(R.string.hint_roi), style = MaterialTheme.typography.bodyMedium, color = AppColors.TextSecondary)
         }
-
         state.cameraError?.let {
             Text(stringResource(R.string.camera_error, it), style = MaterialTheme.typography.bodySmall, color = AppColors.Danger)
             Text(stringResource(R.string.camera_hint_external), style = MaterialTheme.typography.bodySmall, color = AppColors.TextSecondary)
         }
-
         Spacer(Modifier.weight(1f))
         state.metrics?.let {
             Text(
@@ -185,37 +200,29 @@ private fun CameraColumn(state: UiState, viewModel: MainViewModel, modifier: Mod
     }
 }
 
+/**
+ * Fullscreen subtitles. A small live preview stays in the top-left corner so the tablet can be
+ * re-aimed (and the subtitle frame adjusted) without leaving fullscreen.
+ */
 @Composable
-private fun FocusLayout(state: UiState, onExit: () -> Unit) {
-    var controlsVisible by remember { mutableStateOf(false) }
-    Box(
-        Modifier
-            .fillMaxSize()
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
-                controlsVisible = !controlsVisible
-            }
-            .padding(24.dp)
-    ) {
+private fun FocusLayout(state: UiState, camera: @Composable (Modifier) -> Unit, onExit: () -> Unit) {
+    Box(Modifier.fillMaxSize().padding(20.dp)) {
         SubtitlePanel(
-            current = state.current,
-            history = state.history,
+            lines = state.lines,
             settings = state.settings.copy(textSizeSp = state.settings.textSizeSp * 1.25f),
             onScreen = state.subtitleOnScreen,
             placeholder = placeholderFor(state),
             modifier = Modifier.fillMaxSize(),
+            // Keep the newest lines clear of the mini preview in the corner.
+            contentPadding = PaddingValues(start = 40.dp, end = 40.dp, top = 200.dp, bottom = 32.dp),
         )
-        AnimatedVisibility(
-            visible = controlsVisible,
-            enter = fadeIn(),
-            exit = fadeOut(),
+        camera(Modifier.align(Alignment.TopStart).width(300.dp))
+        FilledTonalIconButton(
+            onClick = onExit,
+            colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = AppColors.SurfaceHigh.copy(alpha = 0.85f)),
             modifier = Modifier.align(Alignment.TopEnd),
         ) {
-            FilledTonalIconButton(
-                onClick = onExit,
-                colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = AppColors.SurfaceHigh),
-            ) {
-                Icon(Icons.Rounded.FullscreenExit, stringResource(R.string.action_exit_fullscreen))
-            }
+            Icon(Icons.Rounded.FullscreenExit, stringResource(R.string.action_exit_fullscreen))
         }
     }
 }
@@ -232,7 +239,7 @@ private fun placeholderFor(state: UiState): String = stringResource(
 )
 
 @Composable
-private fun CenterMessage(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+private fun CenterMessage(icon: ImageVector, text: String) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(icon, null, tint = AppColors.TextSecondary, modifier = Modifier.size(40.dp))
         Spacer(Modifier.height(12.dp))

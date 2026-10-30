@@ -32,8 +32,13 @@ class AppSettingsTest {
 
     @Test
     fun `keyed lookup falls back to the default for unknown keys`() {
-        assertEquals(Stability.BALANCED, keyedValueOf("nope", Stability.BALANCED))
-        assertEquals(Stability.FAST, keyedValueOf("fast", Stability.BALANCED))
+        assertEquals(Quality.BEST, keyedValueOf("nope", Quality.BEST))
+        assertEquals(Quality.FAST, keyedValueOf("fast", Quality.BEST))
+    }
+
+    @Test
+    fun `best quality is the default`() {
+        assertEquals(Quality.BEST, AppSettings().quality)
     }
 
     @Test
