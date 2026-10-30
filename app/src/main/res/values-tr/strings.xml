@@ -207,4 +207,9 @@
     <string name="psn_hint">Yalnızca bir kez hesap kimliğinizi bulmak için. Şifreniz sadece Sony\'ye gider.</string>
     <string name="psn_fetching">Hesap kimliğiniz okunuyor…</string>
     <string name="psn_failed">Giriş başarısız: %1$s</string>
+    <string name="remote_find_by_name">PSN adıyla bul</string>
+    <string name="psn_blank_title">Sayfa beyaz mı kalıyor?</string>
+    <string name="psn_blank_body">Girişi tarayıcıda yapın. En sonda boş bir \"redirect\" sayfası açılır: adres çubuğundaki adresin tamamını kopyalayıp buraya yapıştırın.</string>
+    <string name="psn_open_browser">Tarayıcıda aç</string>
+    <string name="psn_paste_url">Redirect adresini yapıştırın</string>
 </resources>

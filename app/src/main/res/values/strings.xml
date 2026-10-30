@@ -219,4 +219,9 @@
     <string name="psn_hint">Only used once to find your account ID. Your password goes to Sony only.</string>
     <string name="psn_fetching">Reading your account ID…</string>
     <string name="psn_failed">Sign-in did not work: %1$s</string>
+    <string name="remote_find_by_name">Find by PSN name</string>
+    <string name="psn_blank_title">Page stays blank?</string>
+    <string name="psn_blank_body">Sign in in the browser instead. It ends on a blank \"redirect\" page: copy its full address from the address bar and paste it here.</string>
+    <string name="psn_open_browser">Open in browser</string>
+    <string name="psn_paste_url">Paste the redirect address</string>
 </resources>
