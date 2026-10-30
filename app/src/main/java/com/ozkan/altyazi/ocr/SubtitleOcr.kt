@@ -6,9 +6,9 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import com.ozkan.altyazi.core.LineOrder
 import java.io.Closeable
 import java.util.concurrent.TimeUnit
-import kotlin.math.max
 
 /** Raw OCR output: line text joined in reading order, plus ML Kit's mean line confidence. */
 data class OcrRead(val text: String, val confidence: Float?)
@@ -32,10 +32,14 @@ class SubtitleOcr : Closeable {
         if (lines.isEmpty()) return OcrRead("", null)
 
         val tallest = lines.maxOf { it.boundingBox!!.height() }
-        val rowHeight = max(1, tallest / 2)
-        val kept = lines
-            .filter { it.boundingBox!!.height() >= tallest * 0.55f }
-            .sortedWith(compareBy({ it.boundingBox!!.centerY() / rowHeight }, { it.boundingBox!!.left }))
+        val candidates = lines.filter { it.boundingBox!!.height() >= tallest * 0.55f }
+        val order = LineOrder.order(
+            candidates.map { line ->
+                val box = line.boundingBox!!
+                LineOrder.Box(box.exactCenterY(), box.height().toFloat(), box.left.toFloat())
+            }
+        )
+        val kept = order.map { candidates[it] }
 
         val confidence = kept.map { it.confidence }.filter { it > 0f }.takeIf { it.isNotEmpty() }?.average()?.toFloat()
         return OcrRead(kept.joinToString(" ") { it.text }, confidence)
