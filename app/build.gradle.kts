@@ -83,6 +83,7 @@ dependencies {
     implementation("androidx.camera:camera-camera2:$camerax")
     implementation("androidx.camera:camera-lifecycle:$camerax")
     implementation("androidx.camera:camera-view:$camerax")
+    implementation("androidx.concurrent:concurrent-futures-ktx:1.2.0")
 
     // On-device OCR (model bundled in the APK) and offline translation
     implementation("com.google.mlkit:text-recognition:16.0.1")

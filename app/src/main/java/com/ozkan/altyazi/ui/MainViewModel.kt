@@ -14,6 +14,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.ozkan.altyazi.camera.CameraSource
 import com.ozkan.altyazi.camera.CameraSources
+import com.ozkan.altyazi.camera.awaitCameraProvider
 import com.ozkan.altyazi.camera.FrameCropper
 import com.ozkan.altyazi.core.SubtitleStabilizer
 import com.ozkan.altyazi.core.SubtitleText
@@ -149,7 +150,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun refreshCameras() {
         val provider = try {
-            ProcessCameraProvider.awaitInstance(getApplication<Application>())
+            getApplication<Application>().awaitCameraProvider()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

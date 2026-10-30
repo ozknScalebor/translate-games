@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.ozkan.altyazi.camera.awaitCameraProvider
 import kotlinx.coroutines.CancellationException
 import java.util.concurrent.Executor
 
@@ -48,7 +49,7 @@ fun CameraViewport(
 
     LaunchedEffect(cameraId, lifecycleOwner) {
         try {
-            val provider = ProcessCameraProvider.awaitInstance(context)
+            val provider = context.awaitCameraProvider()
             val resolution = ResolutionSelector.Builder()
                 .setAspectRatioStrategy(AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY)
                 .setResolutionStrategy(
