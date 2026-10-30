@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Altyazı Çevirici</string>
+
+    <string name="camera_external">Harici kamera</string>
+    <string name="camera_back">Arka kamera</string>
+    <string name="camera_front">Ön kamera</string>
+    <string name="camera_other">Kamera</string>
+    <string name="camera_numbered">%1$s %2$d</string>
+    <string name="camera_none">Kamera bulunamadı</string>
+    <string name="camera_error">Kamera hatası: %1$s</string>
+    <string name="camera_hint_external">USB kamera taktınız ama görünmüyor mu? Uygulamayı yeniden açın.</string>
+
+    <string name="status_ready">Offline çeviri hazır</string>
+    <string name="status_checking">Hazırlanıyor…</string>
+    <string name="status_downloading">Dil paketi indiriliyor…</string>
+    <string name="status_missing">Dil paketi yüklü değil</string>
+    <string name="status_failed">İndirme başarısız</string>
+    <string name="action_retry">Tekrar dene</string>
+    <string name="action_download">İndir</string>
+
+    <string name="action_pause">Duraklat</string>
+    <string name="action_resume">Devam et</string>
+    <string name="action_fullscreen">Tam ekran altyazı</string>
+    <string name="action_exit_fullscreen">Tam ekrandan çık</string>
+    <string name="action_settings">Ayarlar</string>
+
+    <string name="placeholder_waiting">Altyazı bekleniyor…</string>
+    <string name="placeholder_paused">Duraklatıldı</string>
+    <string name="placeholder_preparing">Offline çeviri hazırlanıyor…</string>
+    <string name="placeholder_missing">Çeviriye başlamak için dil paketini indirin</string>
+    <string name="placeholder_failed">Dil paketi indirilemedi. Bağlantınızı kontrol edip tekrar deneyin.</string>
+    <string name="hint_roi">Sarı çerçeveyi oyunun altyazılarının üzerine sürükleyin</string>
+    <string name="metrics">OCR %1$d ms · Çeviri %2$d ms</string>
+    <string name="paused_badge">DURAKLATILDI</string>
+
+    <string name="permission_title">Kamera erişimi gerekli</string>
+    <string name="permission_body">Uygulama, TV\'deki altyazıları kamerayla okur. Görüntüler bu cihazda işlenir ve hiçbir yere gönderilmez.</string>
+    <string name="permission_grant">İzin ver</string>
+    <string name="permission_settings">Ayarları aç</string>
+
+    <string name="dialog_download_title">Dil paketi indirilsin mi?</string>
+    <string name="dialog_download_body">%1$s → %2$s çevirisi için bu cihazda henüz olmayan bir dil paketi gerekiyor (yaklaşık %3$d MB). Paket bir kez indirilir; sonrasında çeviri tamamen offline çalışır.</string>
+    <string name="dialog_download_confirm">İndir</string>
+    <string name="dialog_download_later">Şimdi değil</string>
+
+    <string name="settings_title">Ayarlar</string>
+    <string name="settings_preview_sample">Seni burada görmeyi beklemiyordum.</string>
+    <string name="settings_translation">Çeviri</string>
+    <string name="settings_source">Oyunun dili</string>
+    <string name="settings_target">Çevrilecek dil</string>
+    <string name="settings_swap">Dilleri değiştir</string>
+    <string name="settings_lang_hint">Her dil paketi (yaklaşık 30 MB) bir kez indirilir; sonra her şey offline çalışır.</string>
+    <string name="settings_appearance">Görünüm</string>
+    <string name="settings_text_size">Yazı boyutu</string>
+    <string name="settings_font">Yazı tipi</string>
+    <string name="settings_bold">Kalın yazı</string>
+    <string name="settings_color">Yazı rengi</string>
+    <string name="settings_background">Altyazı arka planı</string>
+    <string name="settings_behavior">Davranış</string>
+    <string name="settings_response">Tepki hızı</string>
+    <string name="settings_show_original">Orijinal metni göster</string>
+    <string name="settings_speak">Çeviriyi sesli oku</string>
+    <string name="settings_voice_missing">%1$s ses yüklü değil. Ayarlar › Genel yönetim › Metin okuma çıkışı bölümünden yükleyin.</string>
+    <string name="settings_reset_roi">Altyazı bölgesini sıfırla</string>
+    <string name="settings_app_language">Uygulama dili</string>
+    <string name="app_lang_system">Sistem</string>
+    <string name="app_lang_en">English</string>
+    <string name="app_lang_tr">Türkçe</string>
+    <string name="sp_value">%1$d sp</string>
+    <string name="selected">Seçili</string>
+
+    <string name="font_modern">Modern</string>
+    <string name="font_medium">Belirgin</string>
+    <string name="font_condensed">Dar</string>
+    <string name="font_serif">Klasik</string>
+    <string name="font_mono">Mono</string>
+    <string name="font_casual">Yuvarlak</string>
+
+    <string name="bg_none">Yok</string>
+    <string name="bg_soft">Yarı saydam</string>
+    <string name="bg_solid">Koyu</string>
+
+    <string name="stability_fast">Hızlı</string>
+    <string name="stability_balanced">Dengeli</string>
+    <string name="stability_stable">Kararlı</string>
+    <string name="stability_fast_desc">En düşük gecikme; ara sıra yarım okuma</string>
+    <string name="stability_balanced_desc">Önerilen ayar</string>
+    <string name="stability_stable_desc">Titrek veya bulanık görüntüde en temiz sonuç</string>
+
+    <string name="lang_en">İngilizce</string>
+    <string name="lang_tr">Türkçe</string>
+    <string name="lang_de">Almanca</string>
+    <string name="lang_fr">Fransızca</string>
+    <string name="lang_es">İspanyolca</string>
+    <string name="lang_it">İtalyanca</string>
+    <string name="lang_pt">Portekizce</string>
+    <string name="lang_nl">Felemenkçe</string>
+    <string name="lang_pl">Lehçe</string>
+    <string name="lang_ru">Rusça</string>
+    <string name="lang_ar">Arapça</string>
+    <string name="lang_ja">Japonca</string>
+    <string name="lang_ko">Korece</string>
+    <string name="lang_zh">Çince</string>
+</resources>

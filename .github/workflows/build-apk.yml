@@ -1,12 +1,22 @@
-name: APK derle
+name: Build APK
 
 on:
   push:
+    branches: [main]
+  pull_request:
   workflow_dispatch:
+
+# A new push cancels any build still running for the same branch.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
 
 jobs:
   build:
-    # ubuntu-24.04 imajında Android SDK hazır kurulu geliyor
+    # ubuntu-24.04 ships with the Android SDK preinstalled.
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -16,20 +26,46 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Android SDK kontrol
-        run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          ls "$ANDROID_HOME/platforms" || true
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+      - name: Accept Android SDK licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: APK derle
+      - name: Test and build
         run: |
+          set -o pipefail
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace
+          ./gradlew testDebugUnitTest assembleRelease assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
+
+      - name: Surface build errors
+        if: failure()
+        run: |
+          # Kotlin compiler errors, failed tests and Gradle failure summaries become annotations.
+          grep -E '^e: |FAILED$|Test.*FAILED|What went wrong' -A2 build.log | head -40 | while IFS= read -r line; do
+            [ -n "$line" ] && echo "::error::${line}"
+          done
+
+      - name: Collect APKs
+        run: |
+          mkdir dist
+          VERSION=$(grep -oP 'versionName = "\K[^"$]+' app/build.gradle.kts)${{ github.run_number }}
+          cp app/build/outputs/apk/release/app-release.apk "dist/SubtitleTranslator-${VERSION}.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "dist/SubtitleTranslator-${VERSION}-debug.apk"
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: AltyaziCevirici-apk
-          path: app/build/outputs/apk/release/*.apk
+          name: SubtitleTranslator-apk
+          path: dist/*.apk
+
+      - name: Publish release
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create latest dist/*.apk \
+            --title "Subtitle Translator ${VERSION}" \
+            --notes "Built from ${GITHUB_SHA::7}. Install \`SubtitleTranslator-${VERSION}.apk\` on your tablet. The \`-debug\` build is only needed for troubleshooting." \
+            --target "${GITHUB_SHA}" \
+            --latest

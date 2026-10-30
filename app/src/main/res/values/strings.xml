@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Subtitle Translator</string>
+
+    <!-- Camera sources -->
+    <string name="camera_external">External camera</string>
+    <string name="camera_back">Rear camera</string>
+    <string name="camera_front">Front camera</string>
+    <string name="camera_other">Camera</string>
+    <string name="camera_numbered">%1$s %2$d</string>
+    <string name="camera_none">No camera found</string>
+    <string name="camera_error">Camera error: %1$s</string>
+    <string name="camera_hint_external">Plugged in a USB camera but don\'t see it? Reopen the app.</string>
+
+    <!-- Translation model status -->
+    <string name="status_ready">Offline translation ready</string>
+    <string name="status_checking">Preparing…</string>
+    <string name="status_downloading">Downloading language pack…</string>
+    <string name="status_missing">Language pack not installed</string>
+    <string name="status_failed">Download failed</string>
+    <string name="action_retry">Retry</string>
+    <string name="action_download">Download</string>
+
+    <!-- Toolbar actions -->
+    <string name="action_pause">Pause</string>
+    <string name="action_resume">Resume</string>
+    <string name="action_fullscreen">Fullscreen subtitles</string>
+    <string name="action_exit_fullscreen">Exit fullscreen</string>
+    <string name="action_settings">Settings</string>
+
+    <!-- Main screen -->
+    <string name="placeholder_waiting">Waiting for subtitles…</string>
+    <string name="placeholder_paused">Paused</string>
+    <string name="placeholder_preparing">Preparing offline translation…</string>
+    <string name="placeholder_missing">Download the language pack to start translating</string>
+    <string name="placeholder_failed">The language pack couldn\'t be downloaded. Check your connection and retry.</string>
+    <string name="hint_roi">Drag the yellow frame over the game\'s subtitles</string>
+    <string name="metrics">OCR %1$d ms · Translation %2$d ms</string>
+    <string name="paused_badge">PAUSED</string>
+
+    <!-- Permission -->
+    <string name="permission_title">Camera access needed</string>
+    <string name="permission_body">The app reads the subtitles on your TV through the camera. Images are processed on this device and never leave it.</string>
+    <string name="permission_grant">Grant access</string>
+    <string name="permission_settings">Open settings</string>
+
+    <!-- Download dialog -->
+    <string name="dialog_download_title">Download language pack?</string>
+    <string name="dialog_download_body">Translating %1$s → %2$s needs a language pack that isn\'t on this device yet (about %3$d MB). It\'s downloaded once; after that, translation works fully offline.</string>
+    <string name="dialog_download_confirm">Download</string>
+    <string name="dialog_download_later">Not now</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_preview_sample">I didn\'t expect to see you here.</string>
+    <string name="settings_translation">Translation</string>
+    <string name="settings_source">Game language</string>
+    <string name="settings_target">Translate to</string>
+    <string name="settings_swap">Swap languages</string>
+    <string name="settings_lang_hint">Each language pack (about 30 MB) is downloaded once; everything then runs offline.</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_text_size">Text size</string>
+    <string name="settings_font">Font</string>
+    <string name="settings_bold">Bold text</string>
+    <string name="settings_color">Text color</string>
+    <string name="settings_background">Subtitle background</string>
+    <string name="settings_behavior">Behavior</string>
+    <string name="settings_response">Response speed</string>
+    <string name="settings_show_original">Show original text</string>
+    <string name="settings_speak">Read translations aloud</string>
+    <string name="settings_voice_missing">No %1$s voice is installed. Install one under Settings › General management › Text-to-speech.</string>
+    <string name="settings_reset_roi">Reset subtitle area</string>
+    <string name="settings_app_language">App language</string>
+    <string name="app_lang_system">System</string>
+    <string name="app_lang_en">English</string>
+    <string name="app_lang_tr">Türkçe</string>
+    <string name="sp_value">%1$d sp</string>
+    <string name="selected">Selected</string>
+
+    <!-- Fonts -->
+    <string name="font_modern">Modern</string>
+    <string name="font_medium">Strong</string>
+    <string name="font_condensed">Condensed</string>
+    <string name="font_serif">Classic</string>
+    <string name="font_mono">Mono</string>
+    <string name="font_casual">Rounded</string>
+
+    <!-- Backgrounds -->
+    <string name="bg_none">None</string>
+    <string name="bg_soft">Translucent</string>
+    <string name="bg_solid">Dark</string>
+
+    <!-- Stability -->
+    <string name="stability_fast">Fast</string>
+    <string name="stability_balanced">Balanced</string>
+    <string name="stability_stable">Stable</string>
+    <string name="stability_fast_desc">Lowest delay; an occasional partial read</string>
+    <string name="stability_balanced_desc">Recommended</string>
+    <string name="stability_stable_desc">Cleanest result with a shaky or blurry image</string>
+
+    <!-- Languages -->
+    <string name="lang_en">English</string>
+    <string name="lang_tr">Turkish</string>
+    <string name="lang_de">German</string>
+    <string name="lang_fr">French</string>
+    <string name="lang_es">Spanish</string>
+    <string name="lang_it">Italian</string>
+    <string name="lang_pt">Portuguese</string>
+    <string name="lang_nl">Dutch</string>
+    <string name="lang_pl">Polish</string>
+    <string name="lang_ru">Russian</string>
+    <string name="lang_ar">Arabic</string>
+    <string name="lang_ja">Japanese</string>
+    <string name="lang_ko">Korean</string>
+    <string name="lang_zh">Chinese</string>
+</resources>
