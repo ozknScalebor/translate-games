@@ -47,16 +47,12 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-/**
- * One subtitle in the transcript. [refined] marks a line translated by the on-device AI;
- * [pending] means its translation is still being generated (typing indicator).
- */
+/** One subtitle in the transcript. [refined] marks a line translated by the on-device AI. */
 data class SubtitleLine(
     val id: Long,
     val original: String,
     val translated: String,
     val refined: Boolean = false,
-    val pending: Boolean = false,
 )
 
 /** Last subtitle's timings; [translateMs] is null when the line was translated by the AI. */
@@ -252,6 +248,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             readSubtitle(image, s)
         } catch (e: Exception) {
             Read.EMPTY
+        } catch (e: OutOfMemoryError) {
+            // A dropped frame is harmless; an uncaught error here would close the app.
+            Read.EMPTY
         }
         val ocrMs = SystemClock.elapsedRealtime() - started
 
@@ -271,16 +270,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private fun readSubtitle(image: ImageProxy, s: AppSettings): Read {
         val english = s.sourceLanguage == Language.ENGLISH
         val crop = FrameCropper.crop(image, s.roi)
-        val variants = if (s.quality.dualPass) listOf(crop, SubtitleEnhancer.isolateSubtitleText(crop)) else listOf(crop)
-        return variants
-            .map { bitmap ->
-                val raw = ocr.readBlocking(bitmap)
-                var text = SubtitleText.clean(raw.text, english)
-                val dict = if (english) dictionary else null
-                if (dict != null) text = repair?.repair(text) ?: text
-                Read.of(text, raw.confidence, dict)
-            }
-            .maxBy { it.score }
+        val variants = mutableListOf(crop)
+        try {
+            if (s.quality.dualPass) variants += SubtitleEnhancer.isolateSubtitleText(crop)
+            return variants
+                .map { bitmap ->
+                    val raw = ocr.readBlocking(bitmap)
+                    var text = SubtitleText.clean(raw.text, english)
+                    val dict = if (english) dictionary else null
+                    if (dict != null) text = repair?.repair(text) ?: text
+                    Read.of(text, raw.confidence, dict)
+                }
+                .maxBy { it.score }
+        } finally {
+            // ~8 crops per second: free them now instead of waiting for the GC, which keeps memory
+            // flat next to the 2.6 GB AI model.
+            variants.forEach { it.recycle() }
+        }
     }
 
     private fun onCommit(text: String, ocrMs: Long) {
@@ -340,26 +346,21 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * AI-only translation: the line appears right away with a typing indicator and fills in as the
-     * on-device model streams its reply (first words after ~0.5 s). No fast translation is shown
-     * first, so the line never visibly "corrects" itself. Only if the model fails, times out or
-     * replies with something implausible does the regular offline translator fill the line instead.
-     * A newer subtitle cancels this job, which also stops generation.
+     * AI-only translation: the line appears once, complete, when the on-device model has finished.
+     * Nothing is shown in between (the previous subtitle stays on screen), so a line never changes
+     * after it appears. Only if the model fails, times out or replies with something implausible
+     * does the regular offline translator provide the line instead. A newer subtitle cancels this
+     * job, which also stops generation.
      */
     private suspend fun translateWithAi(id: Long, text: String, ocrMs: Long) {
         val s = settings
         val started = SystemClock.elapsedRealtime()
-        showLine(SubtitleLine(id, text, translated = "", pending = true))
 
         val english = s.sourceLanguage == Language.ENGLISH
         val speakerLine = SubtitleText.splitSpeaker(text)
         val body = SubtitleText.toSentenceCase(speakerLine.body, english)
         val reply = withTimeoutOrNull(AI_TIMEOUT_MS) {
-            ai.translate(body, s.sourceLanguage.englishName(), s.targetLanguage.englishName(), aiContext.toList()) { partial ->
-                if (partial.isNotEmpty()) {
-                    showLine(SubtitleLine(id, text, speakerLine.format(partial), refined = true, pending = true))
-                }
-            }
+            ai.translate(body, s.sourceLanguage.englishName(), s.targetLanguage.englishName(), aiContext.toList())
         }
 
         if (reply == null) {

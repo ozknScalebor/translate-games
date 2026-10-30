@@ -44,7 +44,11 @@ object FrameCropper {
         if (rotation != 0) matrix.postRotate(rotation.toFloat())
         if (scale != 1f) matrix.postScale(scale, scale)
 
-        return if (matrix.isIdentity) Bitmap.createBitmap(frame, x, y, w, h)
+        val crop = if (matrix.isIdentity) Bitmap.createBitmap(frame, x, y, w, h)
         else Bitmap.createBitmap(frame, x, y, w, h, matrix, true)
+        // The full 1080p frame (~8 MB) is only needed for the crop; createBitmap may return the
+        // frame itself when the region covers all of it.
+        if (crop !== frame) frame.recycle()
+        return crop
     }
 }
