@@ -8,13 +8,16 @@ Built for a PS5 → LG webOS TV setup, but it works with any screen and any cons
 
 ## Features
 
-- **Offline and fast** — on-device OCR (model bundled in the APK) and on-device translation. Typical latency from subtitle to translation is well under a second.
+- **Offline and accurate** — on-device OCR (model bundled in the APK) and on-device translation.
+- **Robust on busy scenes** — each frame is read twice: as captured and as a high-contrast copy that isolates white/yellow subtitle ink from colorful backgrounds. Reads from several frames are then voted on, so one garbled frame can't spoil a line. Digit/letter mix-ups (`1eave`, `G0D`) and ALL-CAPS text are fixed before translation, and `- line - line` dialogue is translated line by line.
+- **Speed vs quality setting** — from *Instant* (~150 ms, single pass) to *Max* (~800 ms, 6-frame voting). Default: *Best* (~550 ms).
 - **Selectable languages** — game language: English, Turkish, German, French, Spanish, Italian, Portuguese, Dutch, Polish. Target language: any of those plus Russian, Arabic, Japanese, Korean and Chinese.
 - **Asks before downloading** — if a language pack (≈30 MB) is missing, the app asks first. After that, no network is needed.
-- **Camera sources at the top** — rear, front and external USB (UVC) cameras. A USB camera plugged in while the app is running is selected automatically. HDMI capture cards that appear as USB cameras work too.
+- **Camera picker** — a dropdown in the top bar lists rear, front and external USB (UVC) cameras. A USB camera plugged in while the app is running is added and selected automatically. HDMI capture cards that appear as USB cameras work too.
 - **Customizable subtitles** — text size, font, weight, color and background.
-- **Clean results** — a stabilizer filters OCR jitter and half-read frames, small HUD text is dropped, speaker names (`ELLIE: …`) are kept but not translated, and the last two lines stay visible in case you missed one.
-- **Fullscreen subtitle mode** and pause.
+- **Scrollable transcript** — every translated line is kept. The newest is large and bright, older lines get smaller and darker; scroll back anytime and jump to the latest with one tap.
+- **Clean results** — small HUD text is dropped and speaker names (`ELLIE: …`) are kept but not translated.
+- **Fullscreen mode** keeps translating, with a small live camera preview in the corner for re-aiming. Pause anytime.
 - **English and Turkish UI**, switchable in the app.
 
 ## Install
@@ -36,24 +39,26 @@ Built for a PS5 → LG webOS TV setup, but it works with any screen and any cons
 - Keep the camera as **square to the screen** as possible and avoid lamp or window reflections on the TV.
 - Fit the frame tightly around the subtitle lines so menus and HUD text stay out.
 - An external 1080p autofocus webcam mounted below the TV gives the sharpest image.
-- **Response speed**: *Fast* reacts on the first frame, *Balanced* (default) confirms over two frames, *Stable* over three for shaky or blurry images.
+- If accuracy is still low on a particular show or game, try **Max**; if you want snappier subtitles, step down to **Balanced** or **Fast**.
 
 ## Architecture
 
 ```
 CameraX (1080p, keep-only-latest)
-  → FrameCropper      crop the subtitle region on the raw frame, rotate only the crop
-  → SubtitleOcr       ML Kit Latin OCR, drops lines much smaller than the subtitle
-  → SubtitleStabilizer commit only stable, genuinely new lines
-  → OfflineTranslator ML Kit Translate, LRU cache, warm-up, newest subtitle wins
+  → FrameCropper       crop the subtitle region on the raw frame, upscale small text
+  → SubtitleEnhancer   high-contrast copy isolating white/yellow subtitle ink (dual pass)
+  → SubtitleOcr        ML Kit Latin OCR on each pass, drops lines much smaller than the subtitle
+  → SubtitleText       fix digit/letter mix-ups, normalize; ReadScore picks the better pass
+  → SubtitleStabilizer vote across frames, commit only stable, genuinely new lines
+  → OfflineTranslator  sentence-case ALL CAPS, split dialogue, ML Kit Translate, LRU cache
   → Compose UI (+ optional TextToSpeech)
 ```
 
 | Package | Responsibility |
 |---|---|
-| `core` | Pure Kotlin logic: stabilizer, similarity, text cleanup, ROI mapping (unit-tested) |
+| `core` | Pure Kotlin logic: read scoring, voting stabilizer, similarity, text cleanup, ROI mapping (unit-tested) |
 | `camera` | Camera discovery and frame cropping |
-| `ocr` | On-device text recognition |
+| `ocr` | On-device text recognition and high-contrast preprocessing |
 | `translate` | Language pack management and translation |
 | `tts` | Optional read-aloud |
 | `data` | Settings model and DataStore persistence |
