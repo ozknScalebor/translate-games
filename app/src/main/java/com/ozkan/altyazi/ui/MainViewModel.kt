@@ -213,13 +213,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * OCRs the subtitle crop and, in dual-pass mode, a high-contrast copy that isolates white/yellow
-     * subtitle ink from the scene behind it. The better-scoring read wins.
+     * OCRs the subtitle crop and, in dual-pass mode, a high-contrast copy that isolates outlined, colorless
+     * subtitle text from the colorful scene behind it. The better-scoring read wins.
      */
     private fun readSubtitle(image: ImageProxy, s: AppSettings): Read {
         val english = s.sourceLanguage == Language.ENGLISH
         val crop = FrameCropper.crop(image, s.roi)
-        val variants = if (s.quality.dualPass) listOf(crop, SubtitleEnhancer.isolateBrightText(crop)) else listOf(crop)
+        val variants = if (s.quality.dualPass) listOf(crop, SubtitleEnhancer.isolateOutlinedText(crop)) else listOf(crop)
         return variants
             .map { bitmap ->
                 val raw = ocr.readBlocking(bitmap)

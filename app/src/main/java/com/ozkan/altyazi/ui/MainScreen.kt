@@ -1,5 +1,6 @@
 package com.ozkan.altyazi.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -19,9 +20,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.FullscreenExit
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.VideocamOff
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
@@ -69,6 +74,7 @@ fun MainScreen(viewModel: MainViewModel) {
             FocusLayout(
                 state = state,
                 camera = { modifier -> cameraCard(state, true, modifier) },
+                onTogglePause = viewModel::togglePause,
                 onExit = { viewModel.setFocusMode(false) },
             )
         } else {
@@ -205,7 +211,14 @@ private fun CameraFooter(state: UiState) {
  * re-aimed (and the subtitle frame adjusted) without leaving fullscreen.
  */
 @Composable
-private fun FocusLayout(state: UiState, camera: @Composable (Modifier) -> Unit, onExit: () -> Unit) {
+private fun FocusLayout(
+    state: UiState,
+    camera: @Composable (Modifier) -> Unit,
+    onTogglePause: () -> Unit,
+    onExit: () -> Unit,
+) {
+    // The system back gesture leaves fullscreen instead of closing the app.
+    BackHandler(onBack = onExit)
     Box(Modifier.fillMaxSize().padding(20.dp)) {
         SubtitlePanel(
             lines = state.lines,
@@ -217,12 +230,30 @@ private fun FocusLayout(state: UiState, camera: @Composable (Modifier) -> Unit, 
             contentPadding = PaddingValues(start = 40.dp, end = 40.dp, top = 200.dp, bottom = 32.dp),
         )
         camera(Modifier.align(Alignment.TopStart).width(300.dp))
-        FilledTonalIconButton(
-            onClick = onExit,
-            colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = AppColors.SurfaceHigh.copy(alpha = 0.85f)),
+        Row(
             modifier = Modifier.align(Alignment.TopEnd),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Rounded.FullscreenExit, stringResource(R.string.action_exit_fullscreen))
+            FilledTonalIconButton(
+                onClick = onTogglePause,
+                colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = AppColors.SurfaceHigh),
+                modifier = Modifier.size(48.dp),
+            ) {
+                Icon(
+                    if (state.paused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
+                    stringResource(if (state.paused) R.string.action_resume else R.string.action_pause),
+                )
+            }
+            Button(
+                onClick = onExit,
+                colors = ButtonDefaults.buttonColors(containerColor = AppColors.Primary),
+                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
+            ) {
+                Icon(Icons.Rounded.FullscreenExit, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.action_exit_fullscreen))
+            }
         }
     }
 }
