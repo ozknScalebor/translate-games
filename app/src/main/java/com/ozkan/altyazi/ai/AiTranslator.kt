@@ -7,6 +7,7 @@ import com.google.ai.edge.litertlm.Contents
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
+import com.google.ai.edge.litertlm.ExperimentalApi
 import com.google.ai.edge.litertlm.ExperimentalFlags
 import com.google.ai.edge.litertlm.SamplerConfig
 import com.ozkan.altyazi.core.AiPrompt
@@ -174,6 +175,10 @@ class AiTranslator(context: Context, private val scope: CoroutineScope) : Closea
         runCatching { translate("Hello there.", "English", "Turkish", emptyList()) }
     }
 
+    // The engine-level flag is the speculative-decoding switch available in LiteRT-LM 0.19 (default:
+    // off); newer releases move it to EngineConfig.speculativeDecodingConfig.
+    @OptIn(ExperimentalApi::class)
+    @Suppress("DEPRECATION")
     private suspend fun createEngine(backend: Backend, speculative: Boolean): Engine? = withContext(Dispatchers.IO) {
         var candidate: Engine? = null
         try {
