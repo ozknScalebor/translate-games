@@ -21,6 +21,19 @@ android {
         resourceConfigurations += listOf("en", "tr")
         // Every Android 16 tablet is 64-bit ARM; shipping one ABI cuts the ML Kit native libraries by ~75%.
         ndk { abiFilters += "arm64-v8a" }
+        externalNativeBuild {
+            cmake {
+                arguments += listOf("-DANDROID_STL=c++_static", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")
+            }
+        }
+    }
+
+    // PS5 Remote Play: chiaki-ng's protocol library (git submodule) plus a small JNI bridge.
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
 
     // Fixed signing key: every CI build is signed identically, so updates never require an uninstall.

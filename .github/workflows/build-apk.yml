@@ -21,6 +21,26 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Fetch Remote Play sources
+        run: |
+          # chiaki-ng is pinned as a submodule; only the native dependencies it needs are fetched.
+          git submodule update --init --depth 1 third_party/chiaki-ng
+          git -C third_party/chiaki-ng submodule update --init --depth 1 \
+            third-party/nanopb third-party/jerasure third-party/gf-complete third-party/curl
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install protobuf tools
+        run: |
+          # nanopb's code generator needs protoc and the protobuf Python package.
+          python -m pip install --quiet protobuf grpcio-tools
+          mkdir -p "$HOME/bin"
+          printf '#!/bin/sh\nexec python -m grpc_tools.protoc "$@"\n' > "$HOME/bin/protoc"
+          chmod +x "$HOME/bin/protoc"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -35,13 +55,13 @@ jobs:
         run: |
           set -o pipefail
           chmod +x gradlew
-          ./gradlew testDebugUnitTest assembleRelease assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
+          ./gradlew testDebugUnitTest assembleRelease --no-daemon --stacktrace 2>&1 | tee build.log
 
       - name: Surface build errors
         if: failure()
         run: |
           # Kotlin compiler errors, failed tests and Gradle failure summaries become annotations.
-          grep -E '^e: |FAILED$|Test.*FAILED|What went wrong' -A2 build.log | head -40 | while IFS= read -r line; do
+          grep -E '^e: |FAILED$|Test.*FAILED|What went wrong|error:|CMake Error' -A2 build.log | head -60 | while IFS= read -r line; do
             [ -n "$line" ] && echo "::error::${line}"
           done
 
@@ -50,7 +70,6 @@ jobs:
           mkdir dist
           VERSION=$(grep -oP 'versionName = "\K[^"$]+' app/build.gradle.kts)${{ github.run_number }}
           cp app/build/outputs/apk/release/app-release.apk "dist/SubtitleTranslator-${VERSION}.apk"
-          cp app/build/outputs/apk/debug/app-debug.apk "dist/SubtitleTranslator-${VERSION}-debug.apk"
           echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
 
       - uses: actions/upload-artifact@v4

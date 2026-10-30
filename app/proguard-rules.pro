@@ -8,3 +8,6 @@
 -dontwarn com.google.ai.edge.litertlm.**
 -dontwarn com.google.auto.value.**
 -dontwarn javax.annotation.**
+
+# PS5 Remote Play: classes, fields and methods are looked up by name from native code.
+-keep class com.ozkan.altyazi.remote.chiaki.** { *; }
